@@ -1,0 +1,130 @@
+const ApiError = require('../utils/apiError');
+const courseModel = require('../models/courseModel');
+const videoModel = require('../models/videoModel');
+const documentModel = require('../models/documentModel');
+const userCourseModel = require('../models/userCourseModel');
+const courseSectionModel = require('../models/courseSectionModel');
+const courseLessonModel = require('../models/courseLessonModel');
+const { buildPagination } = require('../utils/pagination');
+
+const normalizeFreeFilter = (value) => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    return value === '1' || value.toLowerCase() === 'true';
+  }
+  return undefined;
+};
+
+const listCourses = async ({ categoryId, free, search, page, limit }) => {
+  const { limit: take, offset, page: currentPage } = buildPagination(page, limit);
+  const isFree = normalizeFreeFilter(free);
+
+  const [items, total] = await Promise.all([
+    courseModel.listCourses({
+      categoryId,
+      isFree,
+      search,
+      limit: take,
+      offset
+    }),
+    courseModel.countCourses({ categoryId, isFree, search })
+  ]);
+
+  return {
+    items,
+    pagination: {
+      total,
+      page: currentPage,
+      limit: take,
+      pages: Math.ceil(total / take)
+    }
+  };
+};
+
+const canViewPaidCourse = async (course, user) => {
+  if (!course) return false;
+  if (course.is_free) return true;
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+
+  const ownership = await userCourseModel.userHasActiveCourse(user.id, course.id);
+  return Boolean(ownership);
+};
+
+const getCourseDetail = async ({ courseId, user }) => {
+  const course = await courseModel.getCourseById(courseId);
+  if (!course) {
+    throw ApiError.notFound('Course not found');
+  }
+
+  const canViewFull = await canViewPaidCourse(course, user);
+
+  // Lấy sections với lessons
+  const sections = await courseSectionModel.getSectionsByCourseId(courseId);
+  const sectionsWithLessons = await Promise.all(
+    sections.map(async (section) => {
+      const lessons = await courseLessonModel.getLessonsBySectionId(section.id);
+      return {
+        ...section,
+        lessons
+      };
+    })
+  );
+
+  const [videos, documents] = await Promise.all([
+    videoModel.getVideosByCourseId(courseId, { onlyPreview: !canViewFull }),
+    documentModel.listDocuments({ courseId })
+  ]);
+
+  return {
+    ...course,
+    can_view_full: canViewFull,
+    sections: sectionsWithLessons,
+    videos,
+    documents
+  };
+};
+
+const createCourse = async (payload) => {
+  const existing = await courseModel.getCourseByTitle(payload.title);
+  if (existing) {
+    throw ApiError.badRequest('Course title must be unique');
+  }
+
+  return courseModel.createCourse(payload);
+};
+
+const updateCourse = async (id, payload) => {
+  const course = await courseModel.getCourseById(id);
+  if (!course) {
+    throw ApiError.notFound('Course not found');
+  }
+
+  if (payload.title && payload.title !== course.title) {
+    const duplicate = await courseModel.getCourseByTitle(payload.title);
+    if (duplicate && duplicate.id !== id) {
+      throw ApiError.badRequest('Course title must be unique');
+    }
+  }
+
+  return courseModel.updateCourse(id, payload);
+};
+
+const deleteCourse = async (id) => {
+  const course = await courseModel.getCourseById(id);
+  if (!course) {
+    throw ApiError.notFound('Course not found');
+  }
+  await courseModel.deleteCourse(id);
+};
+
+module.exports = {
+  listCourses,
+  getCourseDetail,
+  createCourse,
+  updateCourse,
+  deleteCourse
+};
+

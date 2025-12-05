@@ -1,0 +1,125 @@
+1. Nhóm API Elearning Categories (/api/elearning/categories)
+1.1. Lấy danh sách tất cả danh mục
+Method: GET
+URL: /api/elearning/categories
+Auth: Không yêu cầu (public)
+Query params: Không
+Request body: Không
+Response (200):
+data: Array danh sách category
+total: Number tổng số category
+1.2. Tạo mới danh mục khoá học
+Method: POST
+URL: /api/elearning/categories
+Auth: Bắt buộc:
+authenticate (phải đăng nhập)
+authorizeRoles('admin') (chỉ admin)
+Request body (JSON):
+{  "name": "Tên danh mục (string, 2-100 ký tự, required)"}
+Response (201):
+data: object category vừa tạo
+message: "Category created"
+1.3. Cập nhật danh mục khoá học
+Method: PUT
+URL: /api/elearning/categories/:id
+Auth:
+authenticate
+authorizeRoles('admin')
+URL params:
+id (string, required) – id của danh mục
+Request body (JSON):
+{  "name": "Tên danh mục mới (string, 2-100 ký tự, required)"}
+Response (200):
+data: category sau khi update
+message: "Category updated"
+1.4. Xóa danh mục khoá học
+Method: DELETE
+URL: /api/elearning/categories/:id
+Auth:
+authenticate
+authorizeRoles('admin')
+URL params:
+id (string, required)
+Request body: Không
+Response (200):
+data: {} (rỗng)
+message: "Xóa danh mục thành công"
+1.5. Lấy thống kê danh mục
+Method: GET
+URL: /api/elearning/categories/stats
+Auth:
+authenticate
+authorizeRoles('admin')
+Request body / query: Không
+Response (200):
+data: thống kê từ categoryService.getStats() (tuỳ implement, ví dụ: tổng số category, số course theo category, v.v.)
+2. Nhóm API Elearning Courses (/api/elearning/courses)
+2.1. Lấy danh sách khoá học (có phân trang + lọc + search)
+Method: GET
+URL: /api/elearning/courses
+Auth:
+authenticate
+authorizeRoles('admin')
+Query params:
+page      (number, integer, min 1, optional) – trang hiện tạilimit     (number, integer, 1–100, optional) – số item / trangsearch    (string, optional, cho phép rỗng "") – từ khóa tìm kiếmcategory  (string, optional) – id hoặc slug category (tuỳ service)
+Request body: Không
+Response (200):
+Trả nguyên object data từ courseService.listCourses(...)
+Thường sẽ gồm: items, total, page, limit (phụ thuộc implement của service)
+2.2. Lấy chi tiết một khoá học
+Method: GET
+URL: /api/elearning/courses/:id
+Auth:
+authenticate
+authorizeRoles('admin')
+URL params:
+id (string, required)
+Request body: Không
+Response (200):
+data: thông tin chi tiết 1 course
+2.3. Tạo khoá học mới
+Method: POST
+URL: /api/elearning/courses
+Auth:
+authenticate
+authorizeRoles('admin')
+Request body (JSON):
+}
+{  "title": "Tiêu đề khoá học (string, required)",  "shortDescription": "Mô tả ngắn (string, optional)",  "description": "Mô tả chi tiết (string, required)",  "categoryId": "ID danh mục (string, required)",  "thumbnail": "URL/đường dẫn ảnh (string, optional, cho phép null và \"\")",  "price": "Giá (string, required)",  "level": "beginner | intermediate | advanced (string, optional)",  "duration": "Thời lượng (string, optional, ví dụ '10h30')",  "lessons": 0,  "content": "Nội dung chi tiết (string, optional, cho phép null và \"\")",  "status": "active | inactive (string, optional)"}
+Response (201):
+data: course vừa tạo
+message: "Course created"
+2.4. Cập nhật khoá học
+Method: PUT
+URL: /api/elearning/courses/:id
+Auth:
+authenticate
+authorizeRoles('admin')
+URL params:
+id (string, required)
+Request body (JSON) – tất cả field đều optional:
+{  "title": "string",  "shortDescription": "string",  "description": "string",  "categoryId": "string",  "thumbnail": "string hoặc null",  "price": "string",  "level": "beginner | intermediate | advanced",  "duration": "string",  "lessons": 0,  "content": "string hoặc null",  "status": "active | inactive"}
+Response (200):
+data: course sau khi cập nhật
+message: "Course updated"
+2.5. Xóa khoá học
+Method: DELETE
+URL: /api/elearning/courses/:id
+Auth:
+authenticate
+authorizeRoles('admin')
+URL params:
+id (string, required)
+Request body: Không
+Response (200):
+data: {}
+message: "Course deleted"
+2.6. Lấy thống kê khoá học
+Method: GET
+URL: /api/elearning/courses/stats
+Auth:
+authenticate
+authorizeRoles('admin')
+Request body / query: Không
+Response (200):
+data: thống kê từ courseService.getStats() (ví dụ: tổng số course, tổng doanh thu, số course active/inactive, v.v. – tuỳ implement) udate api vào các trang 
