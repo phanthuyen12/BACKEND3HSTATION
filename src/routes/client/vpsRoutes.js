@@ -7,9 +7,17 @@ const vpsController = require('../../controllers/client/vpsController');
 const router = express.Router();
 
 // GET /api/client/vps/plans - Lấy danh sách gói VPS cho client
+router.get('/plans', vpsController.listPlans);
+
+// GET /api/client/vps/plans/:id/pricing - Lấy bảng giá theo chu kỳ cho 1 gói VPS
 router.get(
-  '/plans',
-  vpsController.listPlans
+  '/plans/:id/pricing',
+  validate({
+    params: Joi.object({
+      id: Joi.string().required()
+    })
+  }),
+  vpsController.getPlanPricing
 );
 
 // POST /api/client/vps/orders - Tạo đơn hàng mua gói VPS
@@ -19,7 +27,11 @@ router.post(
   validate({
     body: Joi.object({
       planId: Joi.string().required(),
-      paymentMethod: Joi.string().valid('balance', 'bank', 'card').optional()
+      paymentMethod: Joi.string().valid('balance', 'bank', 'card').optional(),
+      billingTermCode: Joi.string()
+        .valid('1m', '3m', '6m', '12m', '24m', '36m', '60m', '120m')
+        .optional(),
+      autoRenew: Joi.boolean().optional()
     })
   }),
   vpsController.createOrder

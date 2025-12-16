@@ -41,6 +41,11 @@ const listInstances = async ({ page, limit, userId, status, search }) => {
       ipAddress: instance.ip_address,
       hostname: instance.hostname,
       expiresAt: instance.expires_at,
+      billingTermCode: instance.billing_term_code,
+      billingMonths: instance.billing_months,
+      billingDiscountPercent: instance.billing_discount_percent,
+      billingAutoRenew: instance.billing_auto_renew,
+      billingAmount: instance.billing_amount,
       configuration,
       notes: instance.notes,
       planName: instance.plan_name,
@@ -92,6 +97,11 @@ const getInstanceById = async (id) => {
     ipAddress: instance.ip_address,
     hostname: instance.hostname,
     expiresAt: instance.expires_at,
+    billingTermCode: instance.billing_term_code,
+    billingMonths: instance.billing_months,
+    billingDiscountPercent: instance.billing_discount_percent,
+    billingAutoRenew: instance.billing_auto_renew,
+    billingAmount: instance.billing_amount,
     configuration,
     notes: instance.notes,
     planName: instance.plan_name,
@@ -169,4 +179,5 @@ module.exports = {
   updateInstance,
   deleteInstance
 };
+
 

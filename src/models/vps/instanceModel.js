@@ -121,13 +121,40 @@ const getInstanceByOrderId = async (orderId) => {
   return rows[0] || null;
 };
 
-const createInstance = async ({ userId, orderId, planId, status = 'pending', configuration = null }) => {
+const createInstance = async ({
+  userId,
+  orderId,
+  planId,
+  status = 'pending',
+  configuration = null,
+  expiresAt = null,
+  billingTermCode = null,
+  billingMonths = null,
+  billingDiscountPercent = null,
+  billingAutoRenew = false,
+  billingAmount = null
+}) => {
   const sql = `
-    INSERT INTO vps_instances (user_id, order_id, plan_id, status, configuration)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO vps_instances (
+      user_id, order_id, plan_id, status, configuration, expires_at,
+      billing_term_code, billing_months, billing_discount_percent, billing_auto_renew, billing_amount
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const configJson = configuration ? JSON.stringify(configuration) : null;
-  const [result] = await execute(sql, [userId, orderId, planId, status, configJson]);
+  const [result] = await execute(sql, [
+    userId,
+    orderId,
+    planId,
+    status,
+    configJson,
+    expiresAt,
+    billingTermCode,
+    billingMonths,
+    billingDiscountPercent,
+    billingAutoRenew ? 1 : 0,
+    billingAmount
+  ]);
   return getInstanceById(result.insertId);
 };
 

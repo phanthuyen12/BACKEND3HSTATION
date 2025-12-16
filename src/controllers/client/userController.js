@@ -57,7 +57,14 @@ const getMyCourses = asyncHandler(async (req, res) => {
   return successResponse(res, courses);
 });
 
-module.exports = { getMe, updateMe, getMyOrders, getMyCourses };
+const changePassword = asyncHandler(async (req, res) => {
+  const userService = require('../../services/userService');
+  const userId = req.user.id;
+  await userService.changePassword(userId, req.body);
+  return successResponse(res, {}, 'Password changed successfully');
+});
+
+module.exports = { getMe, updateMe, getMyOrders, getMyCourses, changePassword };
 
 
 

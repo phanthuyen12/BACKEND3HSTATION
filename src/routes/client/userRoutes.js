@@ -33,6 +33,17 @@ router.get(
   userController.getMyOrders
 );
 router.get('/me/my-courses', authenticate, userController.getMyCourses);
+router.post(
+  '/change-password',
+  authenticate,
+  validate({
+    body: Joi.object({
+      currentPassword: Joi.string().min(6).required(),
+      newPassword: Joi.string().min(6).required()
+    })
+  }),
+  userController.changePassword
+);
 
 module.exports = router;
 

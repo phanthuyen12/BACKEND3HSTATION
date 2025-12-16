@@ -185,6 +185,30 @@ const formatUserResponse = (user) => {
 
 const getUserByEmail = (email) => userModel.getUserByEmail(email);
 
+const changePassword = async (userId, { currentPassword, newPassword }) => {
+  // Lấy user với password hash
+  const user = await userModel.getUserByIdWithPassword(parseInt(userId));
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+
+  // Kiểm tra mật khẩu hiện tại
+  const isMatch = await comparePassword(currentPassword, user.password_hash);
+  if (!isMatch) {
+    throw ApiError.badRequest('Current password is incorrect');
+  }
+
+  // Hash mật khẩu mới
+  const newPasswordHash = await hashPassword(newPassword);
+
+  // Cập nhật mật khẩu
+  await userModel.updateUser(parseInt(userId), {
+    passwordHash: newPasswordHash
+  });
+
+  return true;
+};
+
 module.exports = {
   listUsers,
   getUserById,
@@ -194,6 +218,7 @@ module.exports = {
   deleteUser,
   updateBalance,
   getStats,
-  getUserByEmail
+  getUserByEmail,
+  changePassword
 };
 

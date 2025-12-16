@@ -7,3 +7,5 @@ ADD COLUMN IF NOT EXISTS status ENUM('active', 'inactive') DEFAULT 'active' AFTE
 -- Add index for status if not exists
 CREATE INDEX IF NOT EXISTS idx_documents_status ON documents (status);
 
+
+

@@ -40,3 +40,5 @@ ALTER TABLE orders CHANGE COLUMN status_new status ENUM(
   'tao-thanh-cong'
 ) DEFAULT 'pending';
 
+
+
