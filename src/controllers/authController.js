@@ -11,7 +11,7 @@ const register = asyncHandler(async (req, res) => {
 const login = asyncHandler(async (req, res) => {
   const result = await authService.login(req.body);
   console.log('Login result:', result);
-  return successResponse(res, { data: result }, 'Login success');
+  return successResponse(res, { data: result }, 'Login success');  
 });
 
 const logout = asyncHandler(async (req, res) => {
