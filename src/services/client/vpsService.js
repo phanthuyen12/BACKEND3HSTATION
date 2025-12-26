@@ -134,6 +134,8 @@ const createOrder = async ({
   expires.setMonth(expires.getMonth() + term.months);
   const toMySqlDateTime = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
 
+  const referralService = require('../referralService');
+
   try {
     // Create order
     const order = await orderModel.createOrder({
@@ -144,6 +146,14 @@ const createOrder = async ({
       paymentMethod,
       status: isFree ? 'paid' : 'paid'
     });
+
+    // Apply referral commission (30%) if order is paid
+    if (order.status === 'paid') {
+      await referralService.applyReferralCommission({
+        buyerId: userId,
+        orderAmount: finalAmount
+      });
+    }
 
     // Create VPS instance with status 'pending' (waiting for admin to configure)
     const instance = await instanceModel.createInstance({

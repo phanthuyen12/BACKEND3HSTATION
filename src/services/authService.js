@@ -11,20 +11,98 @@ const buildAuthResponse = (user) => {
       id: String(user.id),
       name: user.name,
       email: user.email,
-      role: user.role
+      role: user.role,
+      refCode: user.ref_code || null,
+      refBy: user.ref_by || null,
+      refCount: user.ref_count || 0,
+      refCommission: user.ref_commission || 0
     }
   };
 };
 
-const register = async ({ name, email, password, phone }) => {
+const generateRefCode = (userId) => {
+  // Simple ref code: "REF" + userId + random 4 chars
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `REF${userId}${random}`;
+};
+
+const register = async ({ name, email, password, phone, ref }) => {
   const existing = await userModel.getUserByEmail(email);
   if (existing) {
     throw ApiError.badRequest('Email already exists');
   }
 
   const passwordHash = await hashPassword(password);
-  const user = await userModel.createUser({ name, email, passwordHash, phone });
-  return buildAuthResponse(user);
+  let refByUser = null;
+
+  if (ref) {
+    // ref có thể là ref_code hoặc email
+    ref = String(ref).trim();
+    if (ref) {
+      console.log('[REGISTER] Looking for ref:', ref, '(type:', typeof ref, ')');
+      // Ưu tiên tìm theo ref_code
+      refByUser = await userModel.getUserByRefCode(ref);
+      console.log('[REGISTER] getUserByRefCode result:', refByUser ? `Found user ${refByUser.id}` : 'Not found');
+      
+      if (!refByUser) {
+        // fallback: nếu ref là email
+        console.log('[REGISTER] Trying to find by email:', ref);
+        refByUser = await userModel.getUserByEmail(ref);
+        console.log('[REGISTER] getUserByEmail result:', refByUser ? `Found user ${refByUser.id}` : 'Not found');
+      }
+      
+      if (refByUser) {
+        console.log('[REGISTER] Found ref user:', {
+          id: refByUser.id,
+          email: refByUser.email,
+          ref_code: refByUser.ref_code,
+          ref_count: refByUser.ref_count
+        });
+      } else {
+        console.log('[REGISTER] ❌ Ref user not found for:', ref);
+        console.log('[REGISTER] This means ref_by will be NULL');
+      }
+    }
+  }
+
+  // Tạo user với ref_code tạm thời (sẽ update sau khi có id)
+  const refByUserId = refByUser ? parseInt(refByUser.id, 10) : null;
+  console.log('[REGISTER] Creating user with ref_by:', refByUserId, '(type:', typeof refByUserId, ')');
+  
+  const createdUser = await userModel.createUser({
+    name,
+    email,
+    passwordHash,
+    phone,
+    refCode: null,
+    refBy: refByUserId
+  });
+
+  console.log('[REGISTER] Created user:', createdUser.id, 'ref_by:', createdUser.ref_by, '(type:', typeof createdUser.ref_by, ')');
+
+  // Generate ref_code dựa trên id user vừa tạo
+  const refCode = generateRefCode(createdUser.id);
+  const userWithRef = await userModel.updateUser(createdUser.id, {
+    refCode
+  });
+
+  // Nếu có người giới thiệu, tăng ref_count của họ
+  if (refByUser && refByUser.id) {
+    try {
+      const refByUserId = parseInt(refByUser.id, 10);
+      console.log('[REGISTER] Incrementing ref_count for user:', refByUserId, 'current ref_count:', refByUser.ref_count || 0);
+      // Tăng ref_count (không tăng commission vì chưa có giao dịch)
+      const updatedRefUser = await userModel.incrementRefCount(refByUserId);
+      console.log('[REGISTER] Successfully incremented ref_count. New ref_count:', updatedRefUser.ref_count);
+    } catch (error) {
+      // Log lỗi nhưng không làm fail registration
+      console.error('[REGISTER] Error incrementing ref_count:', error.message, error.stack);
+    }
+  } else {
+    console.log('[REGISTER] No refByUser, skipping ref_count increment. refByUser:', refByUser);
+  }
+
+  return buildAuthResponse(userWithRef);
 };
 
 const login = async ({ email, password }) => {
@@ -38,12 +116,14 @@ const login = async ({ email, password }) => {
     throw ApiError.unauthorized('Invalid credentials');
   }
 
-  return buildAuthResponse({
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role
-  });
+  // Nếu user chưa có ref_code, tạo mới
+  let userWithRef = user;
+  if (!user.ref_code) {
+    const refCode = generateRefCode(user.id);
+    userWithRef = await userModel.updateUser(user.id, { refCode });
+  }
+
+  return buildAuthResponse(userWithRef);
 };
 
 const logout = async (userId) => {

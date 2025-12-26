@@ -122,6 +122,8 @@ const enrollCourse = async (userId, courseId) => {
     await userModel.updateUser(parseInt(userId), { balance: newBalance });
   }
 
+  const referralService = require('../referralService');
+
   // Start transaction: create order, payment, and enrollment
   try {
     // Create order
@@ -133,6 +135,14 @@ const enrollCourse = async (userId, courseId) => {
       paymentMethod: 'balance',
       status: isFree ? 'paid' : 'paid'
     });
+
+    // Apply referral commission (30%) if order is paid
+    if (order.status === 'paid') {
+      await referralService.applyReferralCommission({
+        buyerId: userId,
+        orderAmount: coursePrice
+      });
+    }
 
     // Create payment record if not free
     let payment = null;

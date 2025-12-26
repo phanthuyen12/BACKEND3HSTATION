@@ -69,11 +69,12 @@ const updateOrder = async (id, data) => {
 
   const mapping = {
     status: data.status,
-    payment_method: data.paymentMethod
+    payment_method: data.paymentMethod,
+    download_link: data.downloadLink
   };
 
   Object.entries(mapping)
-    .filter(([, value]) => value !== undefined)
+    .filter(([, value]) => value !== undefined && value !== null)
     .forEach(([column, value]) => {
       fields.push(`${column} = ?`);
       values.push(value);

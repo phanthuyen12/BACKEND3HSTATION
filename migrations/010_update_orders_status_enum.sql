@@ -42,3 +42,6 @@ ALTER TABLE orders CHANGE COLUMN status_new status ENUM(
 
 
 
+
+
+

@@ -12,7 +12,7 @@ app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors({
-    origin: 'http://localhost:56330', // frontend URL
+    origin: 'http://localhost:5173', // frontend URL
     credentials: true, // nếu dùng cookie
 }));
 app.get('/health', (_req, res) => {

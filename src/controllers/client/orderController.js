@@ -2,6 +2,7 @@ const { successResponse } = require('../../utils/response');
 const asyncHandler = require('../../utils/asyncHandler');
 const ApiError = require('../../utils/apiError');
 const orderModel = require('../../models/orders/orderModel');
+const userModel = require('../../models/userModel');
 
 const createOrder = asyncHandler(async (_req, res) => {
   return successResponse(res, { data: { id: '1', type: req.body.type, itemId: req.body.itemId, amount: 0, status: 'pending' } }, 'Order created', 201);
@@ -43,6 +44,14 @@ const getOrderById = asyncHandler(async (req, res) => {
     if (order.item_id) {
       itemInfo = await workflowModel.getWorkflowById(order.item_id);
     }
+    
+    // Lấy download link nếu có
+    if (order.download_link) {
+      itemInfo = {
+        ...itemInfo,
+        downloadLink: order.download_link
+      };
+    }
   } else if (order.type === 'course') {
     // Lấy thông tin course
     const courseModel = require('../../models/courseModel');
@@ -54,12 +63,66 @@ const getOrderById = asyncHandler(async (req, res) => {
   return successResponse(res, {
     ...order,
     item: itemInfo || null,
-    instance: instanceInfo || null
+    instance: instanceInfo || null,
+    downloadLink: order.download_link || null
   });
 });
 
-const payOrder = asyncHandler(async (_req, res) => {
-  return successResponse(res, { data: { id: req.params.id, status: 'paid' } });
+const payOrder = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const order = await orderModel.getOrderById(id);
+  if (!order) {
+    throw ApiError.notFound('Order not found');
+  }
+
+  // Nếu là đơn hàng workflow, tự động assign link chưa bán
+  let downloadLink = null;
+  if (order.type === 'workflow') {
+    try {
+      const workflowLinkModel = require('../../models/workflows/workflowLinkModel');
+      const availableLink = await workflowLinkModel.getAvailableLink(order.item_id);
+      
+      if (availableLink) {
+        // Assign link cho order này
+        await workflowLinkModel.assignLinkToOrder(availableLink.id, order.id, order.user_id);
+        downloadLink = availableLink.download_link;
+        console.log('[PAY_ORDER] Assigned workflow link:', downloadLink, 'to order:', order.id);
+      } else {
+        console.log('[PAY_ORDER] No available workflow link for workflow:', order.item_id);
+      }
+    } catch (error) {
+      console.error('[PAY_ORDER] Error assigning workflow link:', error);
+      // Không làm fail payment nếu assign link lỗi
+    }
+  }
+
+  // Đánh dấu đơn hàng đã thanh toán
+  const updatedOrder = await orderModel.updateOrder(id, { 
+    status: 'paid',
+    downloadLink: downloadLink
+  });
+
+  // Xử lý hoa hồng ref: 30% giá trị đơn hàng
+  try {
+    const referralService = require('../../services/referralService');
+    await referralService.applyReferralCommission({
+      buyerId: order.user_id,
+      orderAmount: order.amount
+    });
+  } catch (e) {
+    // Không làm fail payment nếu tính hoa hồng lỗi
+    // eslint-disable-next-line no-console
+    console.error('Referral commission error:', e);
+  }
+
+  return successResponse(res, { 
+    data: { 
+      id: updatedOrder.id, 
+      status: updatedOrder.status,
+      downloadLink: downloadLink || updatedOrder.download_link
+    } 
+  });
 });
 
 module.exports = { createOrder, getOrderById, payOrder };

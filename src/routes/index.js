@@ -54,8 +54,9 @@ router.use('/elearning', courseLessonRoutes);
 router.use('/vps/plans', vpsPlanRoutes);
 router.use('/vps/instances', vpsInstanceRoutes);
 router.use('/workflows/categories', workflowCategoryRoutes);
-router.use('/workflows', workflowRoutes);
+// Đặt registrations trước để không bị router /workflows bắt các path /workflows/registrations
 router.use('/workflows/registrations', workflowRegistrationRoutes);
+router.use('/workflows', workflowRoutes);
 router.use('/topups', topupRoutes);
 router.use('/banks', bankRoutes);
 router.use('/documents', documentRoutes);

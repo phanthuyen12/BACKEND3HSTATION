@@ -40,6 +40,7 @@ const getWorkflowById = asyncHandler(async (req, res) => {
 
 const registerWorkflow = asyncHandler(async (req, res) => {
   const ApiError = require('../../utils/apiError');
+  const referralService = require('../../services/referralService');
   const userModel = require('../../models/userModel');
   const orderModel = require('../../models/orders/orderModel');
   
@@ -78,7 +79,7 @@ const registerWorkflow = asyncHandler(async (req, res) => {
   const workflowPrice = parseFloat(workflow.price || 0);
   const isFree = workflowPrice === 0;
 
-  // If workflow is not free, check balance and deduct
+    // If workflow is not free, check balance and deduct
   if (!isFree && workflowPrice > 0) {
     const userBalance = parseFloat(user.balance || 0);
     if (userBalance < workflowPrice) {
@@ -101,16 +102,47 @@ const registerWorkflow = asyncHandler(async (req, res) => {
       status: isFree ? 'paid' : 'paid'
     });
 
-    // Create registration (status: cho-duyet - waiting for admin approval)
+    // Nếu đã thanh toán, tự động assign link workflow
+    let downloadLink = null;
+    if (order.status === 'paid') {
+      try {
+        const workflowLinkModel = require('../../models/workflows/workflowLinkModel');
+        const availableLink = await workflowLinkModel.getAvailableLink(parseInt(req.params.id));
+        
+        if (availableLink) {
+          await workflowLinkModel.assignLinkToOrder(availableLink.id, order.id, parseInt(userId));
+          downloadLink = availableLink.download_link;
+          await orderModel.updateOrder(order.id, { downloadLink });
+          console.log('[REGISTER_WORKFLOW] Assigned link:', downloadLink, 'to order:', order.id);
+        }
+      } catch (linkError) {
+        console.error('[REGISTER_WORKFLOW] Error assigning link:', linkError);
+        // Không làm fail registration nếu assign link lỗi
+      }
+    }
+
+    // Create registration (auto approved)
     const registration = await registrationModel.createRegistration({
       userId: parseInt(userId),
       workflowId: parseInt(req.params.id)
     });
 
+    // Apply referral commission (30%) if order is paid
+    if (order.status === 'paid') {
+      await referralService.applyReferralCommission({
+        buyerId: userId,
+        orderAmount: workflowPrice
+      });
+    }
+
     return successResponse(res, { 
       data: { 
         registration, 
-        order,
+        order: {
+          ...order,
+          downloadLink: downloadLink
+        },
+        downloadLink: downloadLink,
         message: 'Đăng ký workflow thành công. Vui lòng đợi admin duyệt.' 
       } 
     }, 'Đăng ký workflow thành công', 201);

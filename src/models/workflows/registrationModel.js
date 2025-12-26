@@ -107,9 +107,9 @@ const getRegistrationById = async (id) => {
 const createRegistration = async ({ userId, workflowId }) => {
   const sql = `
     INSERT INTO workflow_registrations (user_id, workflow_id, status)
-    VALUES (?, ?, 'cho-duyet')
+    VALUES (?, ?, 'da-duyet')
     ON DUPLICATE KEY UPDATE
-      status = 'cho-duyet',
+      status = 'da-duyet',
       reason = NULL,
       updated_at = CURRENT_TIMESTAMP
   `;

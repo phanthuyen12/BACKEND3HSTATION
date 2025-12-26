@@ -10,6 +10,7 @@ const registerSchema = {
   body: Joi.object({
     name: Joi.string().min(2).max(100).required(),
     email: Joi.string().email().required(),
+    ref:Joi.string(),
     password: Joi.string().min(6).required(),
     phone: Joi.string().optional()
   })

@@ -22,6 +22,10 @@ const listUsers = async ({ search, status, page, limit }) => {
     phone: user.phone || '',
     balance: parseFloat(user.balance || 0),
     status: user.status || 'active',
+    refCode: user.ref_code || null,
+    refBy: user.ref_by || null,
+    refCount: user.ref_count || 0,
+    refCommission: parseFloat(user.ref_commission || 0),
     joinedAt: user.created_at,
     lastLoginAt: user.last_login_at || null,
     createdAt: user.created_at,
@@ -40,9 +44,19 @@ const listUsers = async ({ search, status, page, limit }) => {
 };
 
 const getUserById = async (id) => {
-  const user = await userModel.getUserById(parseInt(id));
+  let user = await userModel.getUserById(parseInt(id));
   if (!user) {
     throw ApiError.notFound('User not found');
+  }
+  
+  // Nếu user chưa có ref_code, tạo mới
+  if (!user.ref_code) {
+    const generateRefCode = (userId) => {
+      const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+      return `REF${userId}${random}`;
+    };
+    const refCode = generateRefCode(user.id);
+    user = await userModel.updateUser(parseInt(id), { refCode });
   }
   
   // Get user orders stats
@@ -57,6 +71,10 @@ const getUserById = async (id) => {
     status: user.status || 'active',
     avatar: user.avatar_url || '',
     address: user.address || '',
+    refCode: user.ref_code || null,
+    refBy: user.ref_by || null,
+    refCount: user.ref_count || 0,
+    refCommission: parseFloat(user.ref_commission || 0),
     joinedAt: user.created_at,
     lastLoginAt: user.last_login_at || null,
     orders: {

@@ -3,12 +3,14 @@ const { successResponse } = require('../utils/response');
 const asyncHandler = require('../utils/asyncHandler');
 
 const register = asyncHandler(async (req, res) => {
+  console.log('Register request body:', req.body);
   const result = await authService.register(req.body);
   return successResponse(res, result, 'Register success', 201);
 });
 
 const login = asyncHandler(async (req, res) => {
   const result = await authService.login(req.body);
+  console.log('Login result:', result);
   return successResponse(res, { data: result }, 'Login success');
 });
 

@@ -3,6 +3,7 @@ const Joi = require('joi');
 const { authenticate, authorizeRoles } = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
 const workflowController = require('../../controllers/workflows/workflowController');
+const workflowLinkController = require('../../controllers/workflows/workflowLinkController');
 const adminOrderController = require('../../controllers/orders/adminOrderController');
 
 const router = express.Router();
@@ -95,6 +96,75 @@ router.delete(
   workflowController.deleteWorkflow
 );
 router.get('/stats', authenticate, authorizeRoles('admin'), workflowController.getStats);
+
+// Workflow Links Routes
+// GET /api/workflows/:workflowId/links - Lấy danh sách links
+router.get(
+  '/:workflowId/links',
+  // authenticate,
+  // authorizeRoles('admin'),
+  validate({
+    params: Joi.object({ workflowId: Joi.string().required() }),
+    query: Joi.object({
+      status: Joi.string().valid('chua-ban', 'da-ban').optional()
+    })
+  }),
+  workflowLinkController.getWorkflowLinks
+);
+
+// POST /api/workflows/:workflowId/links/bulk - Thêm links hàng loạt
+router.post(
+  '/:workflowId/links/bulk',
+  // authenticate,
+  // authorizeRoles('admin'),
+  validate({
+    params: Joi.object({ workflowId: Joi.string().required() }),
+    body: Joi.object({
+      links: Joi.array().items(Joi.string().uri().allow('')).required().min(1)
+    })
+  }),
+  workflowLinkController.addWorkflowLinksBulk
+);
+
+// POST /api/workflows/:workflowId/links - Thêm 1 link
+router.post(
+  '/:workflowId/links',
+  // authenticate,
+  // authorizeRoles('admin'),
+  validate({
+    params: Joi.object({ workflowId: Joi.string().required() }),
+    body: Joi.object({
+      downloadLink: Joi.string().uri().required()
+    })
+  }),
+  workflowLinkController.addWorkflowLink
+);
+
+// PUT /api/workflows/links/:linkId - Cập nhật link
+router.put(
+  '/links/:linkId',
+  // authenticate,
+  // authorizeRoles('admin'),
+  validate({
+    params: Joi.object({ linkId: Joi.string().required() }),
+    body: Joi.object({
+      downloadLink: Joi.string().uri().optional(),
+      status: Joi.string().valid('chua-ban', 'da-ban').optional()
+    })
+  }),
+  workflowLinkController.updateWorkflowLink
+);
+
+// DELETE /api/workflows/links/:linkId - Xóa link
+router.delete(
+  '/links/:linkId',
+  // authenticate,
+  // authorizeRoles('admin'),
+  validate({
+    params: Joi.object({ linkId: Joi.string().required() })
+  }),
+  workflowLinkController.deleteWorkflowLink
+);
 
 module.exports = router;
 
