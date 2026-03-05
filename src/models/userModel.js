@@ -254,6 +254,14 @@ const incrementRefCountAndCommission = async (userId, commissionAmount) => {
   return getUserById(userId);
 };
 
+const getUserByApiToken = async (apiToken) => {
+  const rows = await query(
+    'SELECT id, name, email, phone, avatar_url, role, balance, status, address, ref_code, ref_by, ref_count, ref_commission, api_token, created_at, updated_at, last_login_at FROM users WHERE api_token = ?',
+    [apiToken]
+  );
+  return rows[0] || null;
+};
+
 module.exports = {
   createUser,
   getUserByEmail,
@@ -269,6 +277,7 @@ module.exports = {
   getUserStats,
   getUserByRefCode,
   incrementRefCount,
-  incrementRefCountAndCommission
+  incrementRefCountAndCommission,
+  getUserByApiToken
 };
 

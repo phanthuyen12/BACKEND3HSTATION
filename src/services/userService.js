@@ -276,6 +276,8 @@ const changePassword = async (userId, { currentPassword, newPassword }) => {
   return true;
 };
 
+const getUserByApiToken = (apiToken) => userModel.getUserByApiToken(apiToken);
+
 module.exports = {
   listUsers,
   getUserById,
@@ -290,6 +292,7 @@ module.exports = {
   getUserRefs,
   adminResetPassword,
   getUserByEmail,
-  changePassword
+  changePassword,
+  getUserByApiToken
 };
 

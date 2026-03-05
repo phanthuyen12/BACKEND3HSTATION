@@ -58,9 +58,30 @@ const authorizeRoles = (...roles) =>
     next();
   };
 
+const authenticateByToken = asyncHandler(async (req, _res, next) => {
+  const token = req.headers['x-api-token'] || req.query.api_token;
+  if (!token) {
+    throw ApiError.unauthorized('API token missing');
+  }
+
+  const user = await userService.getUserByApiToken(token);
+
+  if (!user) {
+    throw ApiError.unauthorized('Invalid API token');
+  }
+
+  if (user.role !== 'admin') {
+    throw ApiError.forbidden('Admin access required');
+  }
+
+  req.user = user;
+  next();
+});
+
 module.exports = {
   authenticate,
   optionalAuth,
-  authorizeRoles
+  authorizeRoles,
+  authenticateByToken
 };
 

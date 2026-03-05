@@ -309,9 +309,77 @@ const getStatsByDeviceId = async (deviceId) => {
     };
 };
 
+const listNodeverseOrders = async ({ search, page = 1, limit = 10 }) => {
+    const offset = (page - 1) * limit;
+    const clauses = ["o.type = 'nodeverse_vps'"];
+    const params = [];
+
+    if (search) {
+        clauses.push("(o.id LIKE ? OR u.name LIKE ? OR u.email LIKE ?)");
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+    const statsSql = `
+        SELECT SUM(o.amount) as totalRevenue, COUNT(o.id) as totalOrders
+        FROM orders o
+        LEFT JOIN users u ON o.user_id = u.id
+        ${where}
+    `;
+    const [stats] = await query(statsSql, params);
+
+    const sql = `
+        SELECT o.*, 
+               u.name as user_name, u.email as user_email,
+               i.nodeverse_device_id, i.container_id, i.agency_id, i.container_name,
+               i.container_type, i.container_status, i.cpu, i.ram, i.storage,
+               i.ports, i.subdomain, i.custom_domain, i.image, 
+               i.status as instance_status, i.device_name, i.device_ip,
+               i.device_hostname, i.expires_at, i.billing_term_code,
+               i.billing_months, i.billing_discount_percent,
+               i.billing_auto_renew, i.billing_amount, i.notes, i.configuration
+        FROM orders o
+        LEFT JOIN users u ON o.user_id = u.id
+        LEFT JOIN nodeverse_vps_instances i ON o.id = i.order_id
+        ${where}
+        ORDER BY o.created_at DESC
+        LIMIT ? OFFSET ?
+    `;
+    const rows = await query(sql, [...params, parseInt(limit), parseInt(offset)]);
+
+    return {
+        totalRevenue: Number(stats?.totalRevenue) || 0,
+        totalOrders: Number(stats?.totalOrders) || 0,
+        data: rows,
+        pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total: Number(stats?.totalOrders) || 0,
+            totalPages: Math.ceil((Number(stats?.totalOrders) || 0) / limit)
+        }
+    };
+};
+
+const getOrderByContainerId = async (containerId) => {
+    const sql = `
+        SELECT o.*, 
+               u.name as user_name, u.email as user_email,
+               i.billing_months, i.billing_amount,
+               i.container_id, i.container_name, i.container_status,
+               i.device_ip, i.device_hostname
+        FROM nodeverse_vps_instances i
+        JOIN orders o ON i.order_id = o.id
+        LEFT JOIN users u ON o.user_id = u.id
+        WHERE i.container_id = ?
+    `;
+    const rows = await query(sql, [containerId]);
+    return rows[0] || null;
+};
+
 module.exports = {
     listPlans, getPlanById, getPlanByNodeverseDeviceId, upsertPlan, updatePlan,
     createInstance, getInstanceById, listInstances, countInstances, updateInstance,
     getRevenueAndOrdersByAgency, getInstanceByOrderId, getTotalRevenueByAgencies,
-    getGeneralStats, getStatsByDeviceId
+    getGeneralStats, getStatsByDeviceId, listNodeverseOrders, getOrderByContainerId
 };

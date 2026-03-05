@@ -14,6 +14,7 @@ const vpsPlanRoutes = require('./vps/planRoutes');
 const vpsInstanceRoutes = require('./vps/instanceRoutes');
 const nodeverseRoutes = require('./vps/nodeverseRoutes');
 const nodeverseVpsRoutes = require('./vps/nodeverseVpsRoutes');
+const nodeverseAdminRoutes = require('./nodeverseAdminRoutes');
 
 // Workflows routes
 const workflowCategoryRoutes = require('./workflows/categoryRoutes');
@@ -60,6 +61,7 @@ router.use('/vps/plans', vpsPlanRoutes);
 router.use('/vps/instances', vpsInstanceRoutes);
 router.use('/vps/nodeverse', nodeverseRoutes);
 router.use('/vps/nodeverse-plans', nodeverseVpsRoutes);
+router.use('/admin/nodeverse', nodeverseAdminRoutes);
 router.use('/workflows/categories', workflowCategoryRoutes);
 // Đặt registrations trước để không bị router /workflows bắt các path /workflows/registrations
 router.use('/workflows/registrations', workflowRegistrationRoutes);
