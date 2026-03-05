@@ -24,8 +24,15 @@ const listOrders = async ({ userId, type, status, limit, offset }) => {
   }
 
   if (type) {
-    clauses.push('type = ?');
-    params.push(type);
+    if (Array.isArray(type)) {
+      if (type.length > 0) {
+        clauses.push(`type IN (${type.map(() => '?').join(', ')})`);
+        params.push(...type);
+      }
+    } else {
+      clauses.push('type = ?');
+      params.push(type);
+    }
   }
 
   if (status) {
@@ -49,8 +56,15 @@ const countOrders = async ({ userId, type, status }) => {
   }
 
   if (type) {
-    clauses.push('type = ?');
-    params.push(type);
+    if (Array.isArray(type)) {
+      if (type.length > 0) {
+        clauses.push(`type IN (${type.map(() => '?').join(', ')})`);
+        params.push(...type);
+      }
+    } else {
+      clauses.push('type = ?');
+      params.push(type);
+    }
   }
 
   if (status) {

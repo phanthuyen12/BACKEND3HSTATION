@@ -12,6 +12,8 @@ const courseLessonRoutes = require('./courseLessonRoutes');
 // VPS routes
 const vpsPlanRoutes = require('./vps/planRoutes');
 const vpsInstanceRoutes = require('./vps/instanceRoutes');
+const nodeverseRoutes = require('./vps/nodeverseRoutes');
+const nodeverseVpsRoutes = require('./vps/nodeverseVpsRoutes');
 
 // Workflows routes
 const workflowCategoryRoutes = require('./workflows/categoryRoutes');
@@ -30,10 +32,13 @@ const documentRoutes = require('./documentRoutes');
 // Orders routes
 const orderRoutes = require('./orders/orderRoutes');
 const adminOrderRoutes = require('./orders/adminOrderRoutes');
+const configRoutes = require('./configRoutes');
 
 // Client routes
 const clientElearningRoutes = require('./client/elearningRoutes');
 const clientVpsRoutes = require('./client/vpsRoutes');
+const clientNodeverseRoutes = require('./client/nodeverseRoutes');
+const clientNodeverseVpsRoutes = require('./client/nodeverseVpsRoutes');
 const clientWorkflowRoutes = require('./client/workflowRoutes');
 const clientTopupRoutes = require('./client/topupRoutes');
 const clientUserRoutes = require('./client/userRoutes');
@@ -53,6 +58,8 @@ router.use('/elearning', courseSectionRoutes);
 router.use('/elearning', courseLessonRoutes);
 router.use('/vps/plans', vpsPlanRoutes);
 router.use('/vps/instances', vpsInstanceRoutes);
+router.use('/vps/nodeverse', nodeverseRoutes);
+router.use('/vps/nodeverse-plans', nodeverseVpsRoutes);
 router.use('/workflows/categories', workflowCategoryRoutes);
 // Đặt registrations trước để không bị router /workflows bắt các path /workflows/registrations
 router.use('/workflows/registrations', workflowRegistrationRoutes);
@@ -60,9 +67,12 @@ router.use('/workflows', workflowRoutes);
 router.use('/topups', topupRoutes);
 router.use('/banks', bankRoutes);
 router.use('/documents', documentRoutes);
+router.use('/configs', configRoutes);
 
 // Client APIs
 router.use('/client/elearning', clientElearningRoutes);
+router.use('/client/vps/nodeverse', clientNodeverseRoutes);
+router.use('/client/vps/nodeverse-plans', clientNodeverseVpsRoutes);
 router.use('/client/vps', clientVpsRoutes);
 router.use('/client/workflows', clientWorkflowRoutes);
 router.use('/client/topups', clientTopupRoutes);

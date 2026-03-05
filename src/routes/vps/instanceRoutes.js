@@ -49,7 +49,7 @@ router.put(
       status: Joi.string().valid('pending', 'active', 'suspended', 'expired', 'cancelled').optional(),
       ipAddress: Joi.string().ip().optional().allow(''),
       hostname: Joi.string().optional().allow(''),
-      expiresAt: Joi.string().isoDate().optional().allow(''),
+      // expiresAt: Joi.string().isoDate().optional().allow(''),
       configuration: Joi.object().optional(),
       notes: Joi.string().optional().allow('')
     })

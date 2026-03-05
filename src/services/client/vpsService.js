@@ -93,8 +93,21 @@ const createOrder = async ({
   planId,
   paymentMethod = 'balance',
   billingTermCode = '1m',
-  autoRenew = false
+  autoRenew = false,
+  osVersion = null,
+  nodeverseDeviceId = null,
+  nodeverseAgencyId = null
 }) => {
+  // Log order data as requested
+  console.log('--- CREATING VPS ORDER ---');
+  console.log('User ID:', userId);
+  console.log('Plan ID:', planId);
+  console.log('OS Version:', osVersion);
+  console.log('Nodeverse Device ID:', nodeverseDeviceId);
+  console.log('Nodeverse Agency ID:', nodeverseAgencyId);
+  console.log('Term:', billingTermCode);
+  console.log('--------------------------');
+
   // Check if plan exists and is active
   const plan = await planModel.getPlanById(planId);
   if (!plan || plan.status !== 'active') {
@@ -110,7 +123,12 @@ const createOrder = async ({
   const baseMonthlyPrice = parseFloat(plan.price || 0);
   const term = getBillingTerm(billingTermCode);
 
-  const subtotal = baseMonthlyPrice * term.months;
+  // Apply surcharge if Windows (from Nodeverse integration logic)
+  const isWindows = osVersion && osVersion.toLowerCase().includes('windows');
+  const osSurcharge = isWindows ? 120000 : 0;
+
+  const monthlyTotal = baseMonthlyPrice + osSurcharge;
+  const subtotal = monthlyTotal * term.months;
   const discountAmount = (subtotal * term.discountPercent) / 100;
   const finalAmount = subtotal - discountAmount;
 
@@ -167,17 +185,23 @@ const createOrder = async ({
       billingDiscountPercent: term.discountPercent,
       billingAutoRenew: Boolean(autoRenew),
       billingAmount: finalAmount,
+      nodeverseDeviceId: nodeverseDeviceId,
+      agencyId: nodeverseAgencyId,
       configuration: {
         cpu: plan.cpu,
         ram: plan.ram,
         ssd: plan.ssd,
         bandwidth: plan.bandwidth,
+        os_version: osVersion,
+        nodeverse_device_id: nodeverseDeviceId,
+        nodeverse_agency_id: nodeverseAgencyId,
         billing: {
           billingTermCode: term.code,
           months: term.months,
           discountPercent: term.discountPercent,
           autoRenew: Boolean(autoRenew),
           baseMonthlyPrice,
+          osSurcharge,
           subtotal,
           discountAmount,
           finalAmount

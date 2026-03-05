@@ -11,19 +11,21 @@ const authenticate = asyncHandler(async (req, _res, next) => {
 
   const token = header.split(' ')[1];
 
+  let decoded;
   try {
-    const decoded = verifyToken(token);
-    const user = await userService.getUserById(decoded.userId);
-
-    if (!user) {
-      throw ApiError.unauthorized('User not found');
-    }
-
-    req.user = user;
-    next();
+    decoded = verifyToken(token);
   } catch (error) {
     throw ApiError.unauthorized('Invalid or expired token');
   }
+
+  const user = await userService.getUserById(decoded.userId);
+
+  if (!user) {
+    throw ApiError.unauthorized('User not found');
+  }
+
+  req.user = user;
+  next();
 });
 
 const optionalAuth = asyncHandler(async (req, _res, next) => {

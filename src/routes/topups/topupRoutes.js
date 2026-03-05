@@ -6,14 +6,19 @@ const topupController = require('../../controllers/topups/topupController');
 
 const router = express.Router();
 
+// GET /api/topups/stats - phải đặt TRƯỚC /:code
+router.get('/stats',
+  // authenticate, authorizeRoles('admin'),
+  topupController.getStats
+);
+
 router.get(
   '/',
-  authenticate,
-  authorizeRoles('admin'),
+  // authenticate, authorizeRoles('admin'),
   validate({
     query: Joi.object({
       status: Joi.string().valid('cho-duyet', 'da-duyet', 'da-huy').optional(),
-      topupStatus: Joi.string().valid('da-thanh-cong', 'chua-thanh-toan', 'het-han').optional(),
+      topup_status: Joi.string().valid('da-thanh-cong', 'chua-thanh-toan', 'het-han').optional(),
       search: Joi.string().allow('').optional(),
       page: Joi.number().integer().min(1).optional(),
       limit: Joi.number().integer().min(1).max(100).optional()
@@ -23,8 +28,7 @@ router.get(
 );
 router.get(
   '/:code',
-  authenticate,
-  authorizeRoles('admin'),
+  // authenticate, authorizeRoles('admin'),
   validate({
     params: Joi.object({ code: Joi.string().required() })
   }),
@@ -32,8 +36,7 @@ router.get(
 );
 router.patch(
   '/:code/approve',
-  authenticate,
-  authorizeRoles('admin'),
+  // authenticate, authorizeRoles('admin'),
   validate({
     params: Joi.object({ code: Joi.string().required() }),
     body: Joi.object({
@@ -44,8 +47,7 @@ router.patch(
 );
 router.patch(
   '/:code/reject',
-  authenticate,
-  authorizeRoles('admin'),
+  // authenticate, authorizeRoles('admin'),
   validate({
     params: Joi.object({ code: Joi.string().required() }),
     body: Joi.object({
@@ -54,7 +56,6 @@ router.patch(
   }),
   topupController.rejectTopup
 );
-router.get('/stats', authenticate, authorizeRoles('admin'), topupController.getStats);
 
 module.exports = router;
 

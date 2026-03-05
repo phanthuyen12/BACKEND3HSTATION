@@ -19,7 +19,10 @@ const createOrder = asyncHandler(async (req, res) => {
     planId: req.body.planId,
     paymentMethod: req.body.paymentMethod || 'balance',
     billingTermCode: req.body.billingTermCode || '1m',
-    autoRenew: req.body.autoRenew === true
+    autoRenew: req.body.autoRenew === true,
+    osVersion: req.body.osVersion,
+    nodeverseDeviceId: req.body.nodeverseDeviceId,
+    nodeverseAgencyId: req.body.nodeverseAgencyId
   });
   return successResponse(
     res,

@@ -2,19 +2,25 @@ const ApiError = require('../utils/apiError');
 const userModel = require('../models/userModel');
 const { hashPassword, comparePassword } = require('../utils/password');
 const { buildPagination } = require('../utils/pagination');
+const { query } = require('../config/database');
+const crypto = require('crypto');
+
+const generateApiToken = () => {
+  return crypto.randomBytes(32).toString('hex');
+};
 
 const listUsers = async ({ search, status, page, limit }) => {
   const { limit: take, offset, page: currentPage } = buildPagination(page, limit);
-  
+
   const users = await userModel.listUsers({
     search,
     status,
     limit: take,
     offset
   });
-  
+
   const total = await userModel.countUsers({ search, status });
-  
+
   const formattedUsers = users.map(user => ({
     id: String(user.id),
     name: user.name,
@@ -31,7 +37,7 @@ const listUsers = async ({ search, status, page, limit }) => {
     createdAt: user.created_at,
     updatedAt: user.updated_at
   }));
-  
+
   return {
     data: formattedUsers,
     pagination: {
@@ -48,7 +54,7 @@ const getUserById = async (id) => {
   if (!user) {
     throw ApiError.notFound('User not found');
   }
-  
+
   // Nếu user chưa có ref_code, tạo mới
   if (!user.ref_code) {
     const generateRefCode = (userId) => {
@@ -58,14 +64,15 @@ const getUserById = async (id) => {
     const refCode = generateRefCode(user.id);
     user = await userModel.updateUser(parseInt(id), { refCode });
   }
-  
+
   // Get user orders stats
   const orders = await userModel.getUserOrdersStats(parseInt(id));
-  
+
   return {
     id: String(user.id),
     name: user.name,
     email: user.email,
+    role: user.role || 'user',
     phone: user.phone || '',
     balance: parseFloat(user.balance || 0),
     status: user.status || 'active',
@@ -93,7 +100,7 @@ const createUser = async ({ name, email, phone, password, status }) => {
   if (existing) {
     throw ApiError.badRequest('Email already exists');
   }
-  
+
   const passwordHash = await hashPassword(password);
   const user = await userModel.createUser({
     name,
@@ -102,7 +109,7 @@ const createUser = async ({ name, email, phone, password, status }) => {
     passwordHash,
     status: status || 'active'
   });
-  
+
   return formatUserResponse(user);
 };
 
@@ -111,14 +118,14 @@ const updateUser = async (id, payload) => {
   if (!user) {
     throw ApiError.notFound('User not found');
   }
-  
+
   if (payload.email && payload.email !== user.email) {
     const existing = await userModel.getUserByEmail(payload.email);
     if (existing) {
       throw ApiError.badRequest('Email already exists');
     }
   }
-  
+
   const updated = await userModel.updateUser(parseInt(id), {
     name: payload.name,
     email: payload.email,
@@ -126,7 +133,7 @@ const updateUser = async (id, payload) => {
     status: payload.status,
     balance: payload.balance
   });
-  
+
   return formatUserResponse(updated);
 };
 
@@ -135,7 +142,7 @@ const toggleLock = async (id, status) => {
   if (!user) {
     throw ApiError.notFound('User not found');
   }
-  
+
   const updated = await userModel.updateUser(parseInt(id), { status });
   return formatUserResponse(updated);
 };
@@ -153,9 +160,9 @@ const updateBalance = async (id, { amount, type, note }) => {
   if (!user) {
     throw ApiError.notFound('User not found');
   }
-  
+
   let newBalance = parseFloat(user.balance || 0);
-  
+
   if (type === 'add') {
     newBalance += amount;
   } else if (type === 'subtract') {
@@ -166,9 +173,9 @@ const updateBalance = async (id, { amount, type, note }) => {
   } else if (type === 'set') {
     newBalance = amount;
   }
-  
+
   const updated = await userModel.updateUser(parseInt(id), { balance: newBalance });
-  
+
   // In a real implementation, you would log this transaction
   return {
     id: String(updated.id),
@@ -184,6 +191,44 @@ const getStats = async () => {
     totalActive: stats.active || 0,
     totalLocked: stats.locked || 0
   };
+};
+
+const getUserDetailStats = async (id) => {
+  const user = await userModel.getUserById(parseInt(id));
+  if (!user) throw ApiError.notFound('User not found');
+  const orderStats = await userModel.getUserOrdersStats(parseInt(id));
+  // Đếm số ref thực (ref_by = userId)
+  const [refCountRow] = await query('SELECT COUNT(*) as cnt FROM users WHERE ref_by = ?', [parseInt(id)]);
+  return {
+    totalOrders: orderStats.total || 0,
+    courses: orderStats.courses || 0,
+    workflows: orderStats.workflows || 0,
+    vps: orderStats.vps || 0,
+    totalRevenue: orderStats.revenue || 0,
+    refCount: Number(refCountRow?.cnt || 0),
+    refCommission: parseFloat(user.ref_commission || 0)
+  };
+};
+
+const getUserOrders = async (id, { type, page, limit }) => {
+  const user = await userModel.getUserById(parseInt(id));
+  if (!user) throw ApiError.notFound('User not found');
+  return userModel.getUserOrdersPaginated(parseInt(id), { type, page, limit });
+};
+
+const getUserRefs = async (id, { page, limit }) => {
+  const user = await userModel.getUserById(parseInt(id));
+  if (!user) throw ApiError.notFound('User not found');
+  return userModel.getUserRefs(parseInt(id), { page, limit });
+};
+
+const adminResetPassword = async (id, newPassword) => {
+  const user = await userModel.getUserById(parseInt(id));
+  if (!user) throw ApiError.notFound('User not found');
+  const passwordHash = await hashPassword(newPassword);
+  const apiToken = generateApiToken();
+  await userModel.updateUser(parseInt(id), { passwordHash, apiToken });
+  return true;
 };
 
 const formatUserResponse = (user) => {
@@ -219,9 +264,13 @@ const changePassword = async (userId, { currentPassword, newPassword }) => {
   // Hash mật khẩu mới
   const newPasswordHash = await hashPassword(newPassword);
 
-  // Cập nhật mật khẩu
+  // Tạo lại api Token mới cho bảo mật
+  const apiToken = generateApiToken();
+
+  // Cập nhật mật khẩu và api token
   await userModel.updateUser(parseInt(userId), {
-    passwordHash: newPasswordHash
+    passwordHash: newPasswordHash,
+    apiToken
   });
 
   return true;
@@ -236,6 +285,10 @@ module.exports = {
   deleteUser,
   updateBalance,
   getStats,
+  getUserDetailStats,
+  getUserOrders,
+  getUserRefs,
+  adminResetPassword,
   getUserByEmail,
   changePassword
 };

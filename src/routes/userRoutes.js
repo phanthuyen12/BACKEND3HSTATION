@@ -22,6 +22,18 @@ router.get(
   userController.listUsers
 );
 
+// GET /api/users/stats
+router.get('/stats', userController.getStats);
+
+// GET /api/users/:id/detail-stats - thống kê đơn hàng + ref cho 1 user
+router.get('/:id/detail-stats', userController.getUserDetailStats);
+
+// GET /api/users/:id/orders - danh sách đơn hàng của user (có filter type + pagination)
+router.get('/:id/orders', userController.getUserOrders);
+
+// GET /api/users/:id/refs - danh sách user được giới thiệu bởi user này
+router.get('/:id/refs', userController.getUserRefs);
+
 // GET /api/users/:id - Lấy chi tiết một user
 router.get(
   '/:id',
@@ -119,13 +131,18 @@ router.patch(
   userController.updateBalance
 );
 
-// GET /api/users/stats - Lấy thống kê users
-router.get(
-  '/stats',
+// PATCH /api/users/:id/reset-password - Admin đặt lại mật khẩu (không cần mật khẩu cũ)
+router.patch(
+  '/:id/reset-password',
   // authenticate,
   // authorizeRoles('admin'),
-  userController.getStats
+  validate({
+    params: Joi.object({ id: Joi.string().required() }),
+    body: Joi.object({ password: Joi.string().min(6).required() })
+  }),
+  userController.adminResetPassword
 );
+
 
 module.exports = router;
 

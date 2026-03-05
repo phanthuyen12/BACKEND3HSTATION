@@ -132,16 +132,31 @@ const createInstance = async ({
   billingMonths = null,
   billingDiscountPercent = null,
   billingAutoRenew = false,
-  billingAmount = null
+  billingAmount = null,
+  nodeverseDeviceId = null,
+  containerId = null,
+  agencyId = null,
+  containerName = null,
+  containerType = null,
+  containerStatus = null,
+  cpu = null,
+  ram = null,
+  storage = null,
+  ports = null,
+  subdomain = null,
+  customDomain = null,
+  image = null
 }) => {
   const sql = `
     INSERT INTO vps_instances (
       user_id, order_id, plan_id, status, configuration, expires_at,
-      billing_term_code, billing_months, billing_discount_percent, billing_auto_renew, billing_amount
+      billing_term_code, billing_months, billing_discount_percent, billing_auto_renew, billing_amount,
+      nodeverse_device_id, container_id, agency_id, container_name, container_type, container_status,
+      cpu, ram, storage, ports, subdomain, custom_domain, image
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
-  const configJson = configuration ? JSON.stringify(configuration) : null;
+  const configJson = configuration ? (typeof configuration === 'string' ? configuration : JSON.stringify(configuration)) : null;
   const [result] = await execute(sql, [
     userId,
     orderId,
@@ -153,7 +168,20 @@ const createInstance = async ({
     billingMonths,
     billingDiscountPercent,
     billingAutoRenew ? 1 : 0,
-    billingAmount
+    billingAmount,
+    nodeverseDeviceId,
+    containerId,
+    agencyId,
+    containerName,
+    containerType,
+    containerStatus,
+    cpu,
+    ram,
+    storage,
+    ports,
+    subdomain,
+    customDomain,
+    image
   ]);
   return getInstanceById(result.insertId);
 };
@@ -164,10 +192,23 @@ const updateInstance = async (id, data) => {
 
   const mapping = {
     status: data.status,
-    ip_address: data.ipAddress,
-    hostname: data.hostname,
+    ip_address: data.ipAddress || data.deviceIp,
+    hostname: data.hostname || data.deviceHostname,
+    nodeverse_device_id: data.nodeverseDeviceId,
+    container_id: data.containerId,
+    agency_id: data.agencyId,
+    container_name: data.containerName,
+    container_type: data.containerType,
+    container_status: data.containerStatus,
+    cpu: data.cpu,
+    ram: data.ram,
+    storage: data.storage,
+    ports: data.ports,
+    subdomain: data.subdomain,
+    custom_domain: data.customDomain,
+    image: data.image,
     expires_at: data.expiresAt,
-    configuration: data.configuration ? JSON.stringify(data.configuration) : undefined,
+    configuration: data.configuration ? (typeof data.configuration === 'string' ? data.configuration : JSON.stringify(data.configuration)) : undefined,
     notes: data.notes
   };
 

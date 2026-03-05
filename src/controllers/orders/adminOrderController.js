@@ -10,7 +10,7 @@ const getVpsOrders = asyncHandler(async (req, res) => {
   const { limit: take, offset, page: currentPage } = buildPagination(page, limit);
 
   const orders = await orderModel.listOrders({
-    type: 'vps',
+    type: ['vps', 'nodeverse_vps'],
     status,
     limit: take,
     offset
@@ -21,16 +21,27 @@ const getVpsOrders = asyncHandler(async (req, res) => {
     orders.map(async (order) => {
       const userService = require('../../services/userService');
       const user = await userService.getUserById(order.user_id);
-      
-      // Lấy thông tin VPS instance nếu có
-      const vpsInstanceModel = require('../../models/vps/instanceModel');
-      const instance = await vpsInstanceModel.getInstanceByOrderId(order.id);
-      
-      // Lấy thông tin plan nếu có
+
+      let instance = null;
       let planInfo = null;
-      if (order.item_id) {
-        const vpsPlanModel = require('../../models/vps/planModel');
-        planInfo = await vpsPlanModel.getPlanById(order.item_id);
+
+      if (order.type === 'vps') {
+        const vpsInstanceModel = require('../../models/vps/instanceModel');
+        instance = await vpsInstanceModel.getInstanceByOrderId(order.id);
+
+        if (order.item_id) {
+          const vpsPlanModel = require('../../models/vps/planModel');
+          planInfo = await vpsPlanModel.getPlanById(order.item_id);
+        }
+      } else if (order.type === 'nodeverse_vps') {
+        const nodeverseModel = require('../../models/vps/nodeverseModel');
+        // Nodeverse instances current API requires query by id, let's fetch all user instances
+        const userInstances = await nodeverseModel.listInstances({ userId: order.user_id, limit: 100 });
+        instance = userInstances.find(i => Number(i.order_id) === Number(order.id)) || null;
+
+        if (order.item_id) {
+          planInfo = await nodeverseModel.getPlanById(order.item_id);
+        }
       }
 
       return {
@@ -48,7 +59,7 @@ const getVpsOrders = asyncHandler(async (req, res) => {
   );
 
   const total = await orderModel.countOrders({
-    type: 'vps',
+    type: ['vps', 'nodeverse_vps'],
     status
   });
 
@@ -80,7 +91,7 @@ const getWorkflowOrders = asyncHandler(async (req, res) => {
     orders.map(async (order) => {
       const userService = require('../../services/userService');
       const user = await userService.getUserById(order.user_id);
-      
+
       // Lấy thông tin workflow nếu có
       let workflowInfo = null;
       if (order.item_id) {
@@ -144,6 +155,20 @@ const getOrderById = asyncHandler(async (req, res) => {
       instance: instance || null,
       plan: itemInfo || null
     });
+  } else if (order.type === 'nodeverse_vps') {
+    const nodeverseModel = require('../../models/vps/nodeverseModel');
+    const instances = await nodeverseModel.listInstances({ userId: order.user_id, limit: 100 });
+    const instance = instances.find(i => Number(i.order_id) === Number(order.id)) || null;
+
+    if (order.item_id) {
+      itemInfo = await nodeverseModel.getPlanById(order.item_id);
+    }
+    return successResponse(res, {
+      ...order,
+      user: user || null,
+      instance: instance || null,
+      plan: itemInfo || null
+    });
   } else if (order.type === 'workflow') {
     const workflowModel = require('../../models/workflows/workflowModel');
     if (order.item_id) {
@@ -164,42 +189,144 @@ const getOrderById = asyncHandler(async (req, res) => {
 
 // PATCH /api/orders/admin/:id/status - Cập nhật trạng thái đơn hàng
 const updateOrderStatus = asyncHandler(async (req, res) => {
+  console.log('Updating order status with params:', req.params, req.body);
   const { id } = req.params;
   const { status } = req.body;
 
   const order = await orderModel.getOrderById(id);
+  console.log('Fetched order for status update:', order);
   if (!order) {
     throw ApiError.notFound('Order not found');
   }
 
   const updatedOrder = await orderModel.updateOrder(id, { status });
 
-  // Nếu là đơn hàng VPS và status là 'processing' hoặc 'dang-tao', cập nhật instance status
-  if (order.type === 'vps' && (status === 'processing' || status === 'dang-tao')) {
-    const vpsInstanceModel = require('../../models/vps/instanceModel');
-    const instance = await vpsInstanceModel.getInstanceByOrderId(id);
-    if (instance) {
-      await vpsInstanceModel.updateInstance(instance.id, { status: 'dang-tao' });
-    }
-  }
-
-  // Nếu status là 'completed' hoặc 'tao-thanh-cong', cập nhật instance status thành 'active'
-  if (order.type === 'vps' && (status === 'completed' || status === 'tao-thanh-cong')) {
-    const vpsInstanceModel = require('../../models/vps/instanceModel');
-    const instance = await vpsInstanceModel.getInstanceByOrderId(id);
-    if (instance) {
-      await vpsInstanceModel.updateInstance(instance.id, { status: 'active' });
+  // Provisioning logic trigger
+  if (['completed', 'tao-thanh-cong', 'paid'].includes(status)) {
+    console.log('Order status is now active, checking for provisioning:', updatedOrder);
+    if (order.type === 'vps' || order.type === 'nodeverse_vps') {
+      console.log('Triggering provisioning logic for order:', updatedOrder);
+      await provisionNodeverseContainer(order, status);
     }
   }
 
   return successResponse(res, updatedOrder, 'Order status updated successfully');
 });
 
+/** Private Helper: Hanlde auto-provisioning via Nodeverse Containers API */
+async function provisionNodeverseContainer(order, status) {
+  console.log('Provisioning Nodeverse container for order:', order, 'with status:', status);
+  const isVps = order.type === 'vps' ;
+
+  const nodeverseModel = require('../../models/vps/nodeverseModel');
+  const instanceModel = isVps ? require('../../models/vps/instanceModel') : null;
+  // const nodeverseModel = require('../../models/vps/nodeverseModel'); 
+  const planModel = isVps ? require('../../models/vps/planModel') : null;
+  const env = require('../../config/env');
+
+  try {
+    // 1. Find Instance
+    let instance = null;
+    if (isVps) {
+      instance = await instanceModel.getInstanceByOrderId(order.id);
+    } else {
+      console.log('Fetching Nodeverse instances for user to find matching order instance...', { orderId: order.id });
+      const instances = await nodeverseModel.getInstanceByOrderId(order.id);
+      instance = instances; // Assuming getInstanceByOrderId returns the correct instance for the order, otherwise we may need to find it from the list
+      // instance = instances.find(i => Number(i.order_id) === Number(order.id));
+      console.log('Found Nodeverse instance for provisioning:', instances);
+    }
+    if (!instance) return;
+    const configObj = JSON.parse(instance.configuration);
+    console.log('Parsed instance configuration  for provisioning:', configObj);
+    const cpuVPS = configObj?.cpu || 1;
+    const ramVPS = configObj?.ram || 1;
+    const diskVPS = configObj?.ssd || 10;
+    const vpsDeviceId = configObj?.nodeverse_device_id || null;
+    console.log('Extracted CPU, RAM, Disk for provisioning:', { cpuVPS, ramVPS, diskVPS });
+
+    const payload = {
+      vpsDeviceId: vpsDeviceId,
+      type: 'n8n', // Default type
+      cpu: parseInt(cpuVPS || 1),
+      ram: parseInt(ramVPS || 1),
+      storage: parseInt(diskVPS || 10)
+    };
+
+    console.log('[Nodeverse Container Provision] API Call:', `${env.nodeverse.apiUrl}/vps/containers`);
+    console.log('[Nodeverse Container Provision] Body:', JSON.stringify(payload));
+
+    const apiRes = await fetch(`${env.nodeverse.apiUrl}/vps/containers`, {
+      method: 'POST',
+      headers: {
+        'accept': '*/*',
+        'x-api-key': env.nodeverse.apiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    console.log('[Nodeverse Container Provision] API Response Status:', apiRes.status);
+    const data = await apiRes.json();
+    console.log('[Nodeverse Container Provision] API Response Body:', data);
+
+    if (apiRes.ok) {
+      // Success: Update instance with container details in separate columns
+      const updateData = {
+        status: 'active',
+        deviceName: data.name,
+        deviceIp: data.customDomain || data.subdomain || 'N/A',
+        deviceHostname: data.subdomain || 'N/A',
+        // Key container fields into separate columns
+        nodeverseDeviceId: data.vpsDeviceId, // From API: vpsDeviceId
+        containerId: data._id,
+        agencyId: data.agencyId,
+        containerName: data.name,
+        containerType: data.type,
+        containerStatus: data.status,
+        cpu: data.cpu,
+        ram: data.ram,
+        storage: data.storage,
+        ports: Array.isArray(data.ports) ? data.ports.join(',') : String(data.ports || ''),
+        subdomain: data.subdomain,
+        customDomain: data.customDomain,
+        image: data.image,
+        // Keep full JSON as backup if needed
+        configuration: {
+          ...configObj,
+          container_data: data,
+          provisioned_at: new Date().toISOString()
+        },
+        notes: (instance.notes || '') + `\n[SUCCESS] Container provisioned: ${data.name} (${data._id})\nURL: ${data.customDomain || data.subdomain}`
+      };
+
+      if (isVps) {
+        await instanceModel.updateInstance(instance.id, updateData);
+      } else {
+        console.log('Updating Nodeverse instance with provisioning results...', { instanceId: instance.id, updateData });
+        await nodeverseModel.updateInstance(instance.id, updateData);
+      }
+    } else {
+      // Handle API Error
+      console.error('[Nodeverse Container Provision] API Error:', data);
+      const errorNotes = (instance.notes || '') + `\n[ERROR] Provisioning failed: ${JSON.stringify(data)}`;
+      if (isVps) {
+        await instanceModel.updateInstance(instance.id, { notes: errorNotes });
+      } else {
+        await nodeverseModel.updateInstance(instance.id, { notes: errorNotes });
+      }
+    }
+
+  } catch (err) {
+    console.error('[Nodeverse Provision Logic] Failed:', err.message);
+  }
+}
+
 // PATCH /api/orders/admin/:id/notes - Cập nhật ghi chú/description
 const updateOrderNotes = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { notes, description } = req.body;
-
+  console.log('Updating order notes with params:', req.params, req.body);
   const order = await orderModel.getOrderById(id);
   if (!order) {
     throw ApiError.notFound('Order not found');
@@ -210,8 +337,17 @@ const updateOrderNotes = asyncHandler(async (req, res) => {
     const vpsInstanceModel = require('../../models/vps/instanceModel');
     const instance = await vpsInstanceModel.getInstanceByOrderId(id);
     if (instance) {
-      await vpsInstanceModel.updateInstance(instance.id, { 
-        notes: notes || description || instance.notes 
+      await vpsInstanceModel.updateInstance(instance.id, {
+        notes: notes || description || instance.notes
+      });
+    }
+  } else if (order.type === 'nodeverse_vps') {
+    const nodeverseModel = require('../../models/vps/nodeverseModel');
+    const instances = await nodeverseModel.listInstances({ userId: order.user_id, limit: 100 });
+    const instance = instances.find(i => Number(i.order_id) === Number(id));
+    if (instance) {
+      await nodeverseModel.updateInstance(instance.id, {
+        notes: notes || description || instance.notes
       });
     }
   }
@@ -240,13 +376,24 @@ const addOrderAttachment = asyncHandler(async (req, res) => {
     if (instance) {
       const currentNotes = instance.notes || '';
       const attachmentInfo = `\n\n[${attachmentType || 'link'}] ${attachmentName || 'Attachment'}: ${attachmentUrl}`;
-      await vpsInstanceModel.updateInstance(instance.id, { 
+      await vpsInstanceModel.updateInstance(instance.id, {
+        notes: currentNotes + attachmentInfo
+      });
+    }
+  } else if (order.type === 'nodeverse_vps') {
+    const nodeverseModel = require('../../models/vps/nodeverseModel');
+    const instances = await nodeverseModel.listInstances({ userId: order.user_id, limit: 100 });
+    const instance = instances.find(i => Number(i.order_id) === Number(id));
+    if (instance) {
+      const currentNotes = instance.notes || '';
+      const attachmentInfo = `\n\n[${attachmentType || 'link'}] ${attachmentName || 'Attachment'}: ${attachmentUrl}`;
+      await nodeverseModel.updateInstance(instance.id, {
         notes: currentNotes + attachmentInfo
       });
     }
   }
 
-  return successResponse(res, { 
+  return successResponse(res, {
     orderId: id,
     attachmentUrl,
     attachmentName,

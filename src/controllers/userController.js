@@ -49,7 +49,34 @@ const updateBalance = asyncHandler(async (req, res) => {
 
 const getStats = asyncHandler(async (_req, res) => {
   const stats = await userService.getStats();
-  return successResponse(res, { data: stats });
+  return successResponse(res, stats);
+});
+
+const getUserDetailStats = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const stats = await userService.getUserDetailStats(id);
+  return successResponse(res, stats);
+});
+
+const getUserOrders = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { type, page, limit } = req.query;
+  const result = await userService.getUserOrders(id, { type, page, limit });
+  return successResponse(res, result);
+});
+
+const getUserRefs = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { page, limit } = req.query;
+  const result = await userService.getUserRefs(id, { page, limit });
+  return successResponse(res, result);
+});
+
+const adminResetPassword = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { password } = req.body;
+  await userService.adminResetPassword(id, password);
+  return successResponse(res, {}, 'Mật khẩu đã được cập nhật');
 });
 
 module.exports = {
@@ -60,7 +87,11 @@ module.exports = {
   toggleLock,
   deleteUser,
   updateBalance,
-  getStats
+  getStats,
+  getUserDetailStats,
+  getUserOrders,
+  getUserRefs,
+  adminResetPassword
 };
 
 

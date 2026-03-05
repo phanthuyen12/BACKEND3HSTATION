@@ -17,6 +17,10 @@ const env = {
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'labtest',
     connectionLimit: Number(process.env.DB_POOL_LIMIT || 10)
+  },
+  nodeverse: {
+    apiUrl: process.env.NODEVERSE_API_URL || 'https://vps-api.nodeverse.ai/api',
+    apiKey: process.env.NODEVERSE_API_KEY || ''
   }
 };
 

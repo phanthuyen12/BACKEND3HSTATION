@@ -2,6 +2,7 @@ const ApiError = require('../utils/apiError');
 const userModel = require('../models/userModel');
 const { hashPassword, comparePassword } = require('../utils/password');
 const { signToken } = require('../utils/jwt');
+const crypto = require('crypto');
 
 const buildAuthResponse = (user) => {
   const token = signToken({ userId: user.id, role: user.role });
@@ -15,9 +16,14 @@ const buildAuthResponse = (user) => {
       refCode: user.ref_code || null,
       refBy: user.ref_by || null,
       refCount: user.ref_count || 0,
-      refCommission: user.ref_commission || 0
+      refCommission: user.ref_commission || 0,
+      apiToken: user.api_token || null
     }
   };
+};
+
+const generateApiToken = () => {
+  return crypto.randomBytes(32).toString('hex');
 };
 
 const generateRefCode = (userId) => {
@@ -43,14 +49,14 @@ const register = async ({ name, email, password, phone, ref }) => {
       // Ưu tiên tìm theo ref_code
       refByUser = await userModel.getUserByRefCode(ref);
       console.log('[REGISTER] getUserByRefCode result:', refByUser ? `Found user ${refByUser.id}` : 'Not found');
-      
+
       if (!refByUser) {
         // fallback: nếu ref là email
         console.log('[REGISTER] Trying to find by email:', ref);
         refByUser = await userModel.getUserByEmail(ref);
         console.log('[REGISTER] getUserByEmail result:', refByUser ? `Found user ${refByUser.id}` : 'Not found');
       }
-      
+
       if (refByUser) {
         console.log('[REGISTER] Found ref user:', {
           id: refByUser.id,
@@ -68,7 +74,7 @@ const register = async ({ name, email, password, phone, ref }) => {
   // Tạo user với ref_code tạm thời (sẽ update sau khi có id)
   const refByUserId = refByUser ? parseInt(refByUser.id, 10) : null;
   console.log('[REGISTER] Creating user with ref_by:', refByUserId, '(type:', typeof refByUserId, ')');
-  
+
   const createdUser = await userModel.createUser({
     name,
     email,
@@ -80,10 +86,12 @@ const register = async ({ name, email, password, phone, ref }) => {
 
   console.log('[REGISTER] Created user:', createdUser.id, 'ref_by:', createdUser.ref_by, '(type:', typeof createdUser.ref_by, ')');
 
-  // Generate ref_code dựa trên id user vừa tạo
+  // Generate ref_code & api_token dựa trên id user vừa tạo
   const refCode = generateRefCode(createdUser.id);
+  const apiToken = generateApiToken();
   const userWithRef = await userModel.updateUser(createdUser.id, {
-    refCode
+    refCode,
+    apiToken
   });
 
   // Nếu có người giới thiệu, tăng ref_count của họ
@@ -116,11 +124,14 @@ const login = async ({ email, password }) => {
     throw ApiError.unauthorized('Invalid credentials');
   }
 
-  // Nếu user chưa có ref_code, tạo mới
+  // Nếu user chưa có ref_code hoặc api_token, tạo mới
   let userWithRef = user;
-  if (!user.ref_code) {
-    const refCode = generateRefCode(user.id);
-    userWithRef = await userModel.updateUser(user.id, { refCode });
+  const updates = {};
+  if (!user.ref_code) updates.refCode = generateRefCode(user.id);
+  if (!user.api_token) updates.apiToken = generateApiToken();
+
+  if (Object.keys(updates).length > 0) {
+    userWithRef = await userModel.updateUser(user.id, updates);
   }
 
   return buildAuthResponse(userWithRef);
