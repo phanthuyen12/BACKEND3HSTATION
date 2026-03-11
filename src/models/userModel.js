@@ -88,7 +88,9 @@ const updateUser = async (id, data) => {
     ref_by: data.refBy,
     ref_count: data.refCount,
     ref_commission: data.refCommission,
-    api_token: data.apiToken
+    api_token: data.apiToken,
+    reset_password_token: data.resetPasswordToken,
+    reset_password_expires: data.resetPasswordExpires
   };
 
   Object.entries(mapping)
@@ -262,6 +264,14 @@ const getUserByApiToken = async (apiToken) => {
   return rows[0] || null;
 };
 
+const getUserByResetToken = async (token) => {
+  const rows = await query(
+    'SELECT * FROM users WHERE reset_password_token = ? AND reset_password_expires > NOW() LIMIT 1',
+    [token]
+  );
+  return rows[0] || null;
+};
+
 module.exports = {
   createUser,
   getUserByEmail,
@@ -278,6 +288,7 @@ module.exports = {
   getUserByRefCode,
   incrementRefCount,
   incrementRefCountAndCommission,
-  getUserByApiToken
+  getUserByApiToken,
+  getUserByResetToken
 };
 

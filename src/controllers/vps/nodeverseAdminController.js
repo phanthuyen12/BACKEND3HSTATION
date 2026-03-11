@@ -32,15 +32,15 @@ const getOrderDetailsByContainerId = asyncHandler(async (req, res) => {
         throw ApiError.badRequest('Container ID is required');
     }
 
-    const order = await nodeverseModel.getOrderByContainerId(containerId);
+    const data = await nodeverseModel.getInstanceWithHistoryByContainerId(containerId);
 
-    if (!order) {
-        throw ApiError.notFound('Không tìm thấy đơn hàng với container_id này');
+    if (!data) {
+        throw ApiError.notFound('Không tìm thấy thông tin với container_id này');
     }
 
     res.json({
         success: true,
-        data: order
+        data: data
     });
 });
 

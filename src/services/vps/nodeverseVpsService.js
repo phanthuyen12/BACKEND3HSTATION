@@ -558,14 +558,192 @@ const formatPlan = (plan) => ({
   updatedAt: plan.updated_at,
 });
 
+const renewOrder = async ({ userId, instanceId, billingTermCode = "1m", paymentMethod = "balance" }) => {
+  const instance = await nodeverseModel.getInstanceById(instanceId);
+  if (!instance || instance.user_id !== parseInt(userId)) {
+    throw ApiError.notFound("Không tìm thấy VPS");
+  }
+
+  const user = await userModel.getUserById(parseInt(userId));
+  if (!user) throw ApiError.notFound("User không tồn tại");
+
+  const term = getBillingTerm(billingTermCode);
+
+  // Parse configuration to check if it's hybrid
+  const config = typeof instance.configuration === 'string' ? JSON.parse(instance.configuration || '{}') : (instance.configuration || {});
+  const isHybrid = config.is_hybrid;
+
+  let plan = null;
+  if (isHybrid) {
+    const planModel = require('../../models/vps/planModel');
+    plan = await planModel.getPlanById(instance.plan_id);
+  } else {
+    plan = await nodeverseModel.getPlanById(parseInt(instance.plan_id));
+  }
+
+  if (!plan) throw ApiError.notFound("Gói dịch vụ gốc không còn tồn tại");
+
+  const baseMonthlyPrice = parseFloat(plan.price || 0);
+
+  // Windows surcharge (if applicable)
+  const osVersion = config.os_version || instance.operating_system;
+  const isWindows = osVersion && osVersion.toLowerCase().includes('windows');
+  const osSurcharge = isWindows ? 120000 : 0;
+
+  const monthlyTotal = baseMonthlyPrice + osSurcharge;
+  const subtotal = monthlyTotal * term.months;
+  const discountAmount = (subtotal * term.discountPercent) / 100;
+  const finalAmount = subtotal - discountAmount;
+
+  // Check balance
+  const userBalance = parseFloat(user.balance || 0);
+  if (userBalance < finalAmount) {
+    throw ApiError.badRequest("Số dư tài khoản không đủ để gia hạn");
+  }
+
+  // Deduct balance
+  await userModel.updateUser(parseInt(userId), {
+    balance: userBalance - finalAmount,
+  });
+
+  // Update expiry date
+  const currentExpires = new Date(instance.expires_at);
+  const now = new Date();
+
+  // If not expired yet, add to current expiry, else add to now
+  let newExpires = currentExpires > now ? new Date(currentExpires) : new Date(now);
+  newExpires.setMonth(newExpires.getMonth() + term.months);
+
+  const toMySql = (d) => d.toISOString().slice(0, 19).replace("T", " ");
+
+  try {
+    // Create renewal order
+    const order = await orderModel.createOrder({
+      userId: parseInt(userId),
+      type: "nodeverse_vps",
+      itemId: String(instance.id),
+      amount: finalAmount,
+      paymentMethod,
+      status: "completed",
+    });
+
+    // Update instance
+    await nodeverseModel.updateInstance(instance.id, {
+      expiresAt: toMySql(newExpires),
+      status: 'active', // Reactivate if suspended
+      billingTermCode: term.code,
+      billingMonths: term.months,
+      billingDiscountPercent: term.discountPercent,
+      billingAmount: finalAmount
+    });
+
+    return {
+      success: true,
+      newExpiresAt: newExpires,
+      orderId: order.id,
+      amount: finalAmount
+    };
+  } catch (error) {
+    // Rollback balance (simplified, in real scenario use transactions)
+    await userModel.updateUser(parseInt(userId), {
+      balance: parseFloat(user.balance || 0),
+    });
+    throw error;
+  }
+};
+
+const adminUpdateInstance = async (id, data) => {
+  const instance = await nodeverseModel.getInstanceById(id);
+  if (!instance) throw ApiError.notFound("Không tìm thấy VPS");
+
+  const toMySql = (d) => {
+    if (!d) return null;
+    try {
+      return new Date(d).toISOString().slice(0, 19).replace("T", " ");
+    } catch {
+      return d;
+    }
+  };
+
+  const updated = await nodeverseModel.updateInstance(id, {
+    status: data.status,
+    deviceIp: data.ipAddress,
+    deviceHostname: data.hostname,
+    expiresAt: toMySql(data.expiresAt),
+    notes: data.notes,
+    configuration: data.configuration
+  });
+
+  return updated;
+};
+
+const adminGetInstanceDetail = async (id) => {
+  const instance = await nodeverseModel.getInstanceById(id);
+  if (!instance) throw ApiError.notFound("Không tìm thấy VPS");
+
+  // Get current plan info
+  const plan = await nodeverseModel.getPlanById(instance.plan_id);
+
+  // Get owner user
+  const user = await userModel.getUserById(instance.user_id);
+
+  return {
+    ...instance,
+    plan,
+    user: user ? { id: user.id, name: user.name, email: user.email } : null,
+    configuration: typeof instance.configuration === 'string' ? JSON.parse(instance.configuration || '{}') : instance.configuration
+  };
+};
+
+const adminGetInstanceHistory = async (id) => {
+  const instance = await nodeverseModel.getInstanceById(id);
+  if (!instance) throw ApiError.notFound("Không tìm thấy VPS");
+
+  // Find orders where either:
+  // 1. Order ID matches instance.order_id (Purchase)
+  // 2. Item ID matches instance ID AND type is nodeverse_vps (Renewals)
+
+  const purchaseOrder = await orderModel.getOrderById(instance.order_id);
+  const renewals = await orderModel.listOrders({
+    itemId: String(id),
+    type: 'nodeverse_vps',
+    limit: 100,
+    offset: 0
+  });
+
+  const history = [];
+  if (purchaseOrder) {
+    history.push({
+      ...purchaseOrder,
+      historyType: 'purchase'
+    });
+  }
+
+  renewals.forEach(r => {
+    if (String(r.id) !== String(instance.order_id)) { // Avoid duplicating purchase order if it was listed in renewals
+      history.push({
+        ...r,
+        historyType: 'renewal'
+      });
+    }
+  });
+
+  // Sort by date desc
+  return history.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+};
+
 module.exports = {
   BILLING_TERMS,
   syncDevicesFromNodeverse,
   adminListPlans,
   adminUpdatePlan,
+  adminUpdateInstance,
+  adminGetInstanceDetail,
+  adminGetInstanceHistory,
   clientListPlans,
   getPlanPricing,
   createOrder,
+  renewOrder,
   getMyOrders,
   getMyOrderById,
   changeContainerState,
@@ -573,3 +751,4 @@ module.exports = {
   adminGetGeneralStats,
   adminGetStatsByDeviceId,
 };
+

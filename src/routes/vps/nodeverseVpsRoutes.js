@@ -59,4 +59,41 @@ router.put(
     ctrl.adminUpdatePlan
 );
 
+// PUT /api/vps/nodeverse-plans/instances/:id — Cập nhật instance (admin)
+router.put(
+    '/instances/:id',
+    authenticate,
+    authorizeRoles('admin'),
+    validate({
+        params: Joi.object({ id: Joi.string().required() }),
+        body: Joi.object({
+            status: Joi.string().valid('pending', 'active', 'suspended', 'expired', 'cancelled').optional(),
+            ipAddress: Joi.string().optional().allow(''),
+            hostname: Joi.string().optional().allow(''),
+            expiresAt: Joi.string().optional().allow(''),
+            configuration: Joi.object().optional(),
+            notes: Joi.string().optional().allow('')
+        })
+    }),
+    ctrl.adminUpdateInstance
+);
+
+// GET /api/vps/nodeverse-plans/instances/:id — Lấy chi tiết instance (admin)
+router.get(
+    '/instances/:id',
+    authenticate,
+    authorizeRoles('admin'),
+    validate({ params: Joi.object({ id: Joi.string().required() }) }),
+    ctrl.adminGetInstanceDetail
+);
+
+// GET /api/vps/nodeverse-plans/instances/:id/history — Lấy lịch sử gia hạn (admin)
+router.get(
+    '/instances/:id/history',
+    authenticate,
+    authorizeRoles('admin'),
+    validate({ params: Joi.object({ id: Joi.string().required() }) }),
+    ctrl.adminGetInstanceHistory
+);
+
 module.exports = router;

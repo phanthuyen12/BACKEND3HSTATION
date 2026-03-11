@@ -190,6 +190,11 @@ const updateInstance = async (id, data) => {
         device_ip: data.deviceIp,
         device_hostname: data.deviceHostname,
         notes: data.notes,
+        expires_at: data.expiresAt,
+        billing_term_code: data.billingTermCode,
+        billing_months: data.billingMonths,
+        billing_discount_percent: data.billingDiscountPercent,
+        billing_amount: data.billingAmount,
         configuration: data.configuration ? (typeof data.configuration === 'string' ? data.configuration : JSON.stringify(data.configuration)) : undefined
     };
     Object.entries(mapping)
@@ -315,8 +320,9 @@ const listNodeverseOrders = async ({ search, page = 1, limit = 10 }) => {
     const params = [];
 
     if (search) {
-        clauses.push("(o.id LIKE ? OR u.name LIKE ? OR u.email LIKE ?)");
-        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        clauses.push("(o.id LIKE ? OR u.name LIKE ? OR u.email LIKE ? OR i1.container_id LIKE ? OR i2.container_id LIKE ? OR i1.device_name LIKE ? OR i2.device_name LIKE ?)");
+        const searchParam = `%${search}%`;
+        params.push(searchParam, searchParam, searchParam, searchParam, searchParam, searchParam, searchParam);
     }
 
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
@@ -325,6 +331,8 @@ const listNodeverseOrders = async ({ search, page = 1, limit = 10 }) => {
         SELECT SUM(o.amount) as totalRevenue, COUNT(o.id) as totalOrders
         FROM orders o
         LEFT JOIN users u ON o.user_id = u.id
+        LEFT JOIN nodeverse_vps_instances i1 ON o.id = i1.order_id
+        LEFT JOIN nodeverse_vps_instances i2 ON (o.item_id = CAST(i2.id AS CHAR) AND i1.id IS NULL AND o.type = 'nodeverse_vps')
         ${where}
     `;
     const [stats] = await query(statsSql, params);
@@ -332,21 +340,82 @@ const listNodeverseOrders = async ({ search, page = 1, limit = 10 }) => {
     const sql = `
         SELECT o.*, 
                u.name as user_name, u.email as user_email,
-               i.nodeverse_device_id, i.container_id, i.agency_id, i.container_name,
-               i.container_type, i.container_status, i.cpu, i.ram, i.storage,
-               i.ports, i.subdomain, i.custom_domain, i.image, 
-               i.status as instance_status, i.device_name, i.device_ip,
-               i.device_hostname, i.expires_at, i.billing_term_code,
-               i.billing_months, i.billing_discount_percent,
-               i.billing_auto_renew, i.billing_amount, i.notes, i.configuration
+               COALESCE(i1.id, i2.id) as real_instance_id,
+               COALESCE(i1.order_id, i2.order_id) as instance_purchase_order_id,
+               COALESCE(i1.nodeverse_device_id, i2.nodeverse_device_id) as nodeverse_device_id,
+               COALESCE(i1.container_id, i2.container_id) as container_id,
+               COALESCE(i1.agency_id, i2.agency_id) as agency_id,
+               COALESCE(i1.container_name, i2.container_name) as container_name,
+               COALESCE(i1.container_type, i2.container_type) as container_type,
+               COALESCE(i1.container_status, i2.container_status) as container_status,
+               COALESCE(i1.cpu, i2.cpu) as cpu,
+               COALESCE(i1.ram, i2.ram) as ram,
+               COALESCE(i1.storage, i2.storage) as storage,
+               COALESCE(i1.ports, i2.ports) as ports,
+               COALESCE(i1.subdomain, i2.subdomain) as subdomain,
+               COALESCE(i1.custom_domain, i2.custom_domain) as custom_domain,
+               COALESCE(i1.image, i2.image) as image, 
+               COALESCE(i1.status, i2.status) as instance_status,
+               COALESCE(i1.device_name, i2.device_name) as device_name,
+               COALESCE(i1.device_ip, i2.device_ip) as device_ip,
+               COALESCE(i1.device_hostname, i2.device_hostname) as device_hostname,
+               COALESCE(i1.expires_at, i2.expires_at) as expires_at,
+               COALESCE(i1.billing_term_code, i2.billing_term_code) as billing_term_code,
+               COALESCE(i1.billing_months, i2.billing_months) as billing_months,
+               COALESCE(i1.billing_discount_percent, i2.billing_discount_percent) as billing_discount_percent,
+               COALESCE(i1.billing_auto_renew, i2.billing_auto_renew) as billing_auto_renew,
+               COALESCE(i1.billing_amount, i2.billing_amount) as billing_amount,
+               COALESCE(i1.notes, i2.notes) as notes,
+               COALESCE(i1.configuration, i2.configuration) as configuration
         FROM orders o
         LEFT JOIN users u ON o.user_id = u.id
-        LEFT JOIN nodeverse_vps_instances i ON o.id = i.order_id
+        LEFT JOIN nodeverse_vps_instances i1 ON o.id = i1.order_id
+        LEFT JOIN nodeverse_vps_instances i2 ON (o.item_id = CAST(i2.id AS CHAR) AND i1.id IS NULL AND o.type = 'nodeverse_vps')
         ${where}
         ORDER BY o.created_at DESC
         LIMIT ? OFFSET ?
     `;
     const rows = await query(sql, [...params, parseInt(limit), parseInt(offset)]);
+
+    // Fetch history for each instance in the results
+    const instanceIds = [...new Set(rows.map(r => r.real_instance_id).filter(id => id != null))];
+    if (instanceIds.length > 0) {
+        // Prepare placeholders for IN clause because pool.execute doesn't support array expansion in IN (?)
+        const placeholders = instanceIds.map(() => '?').join(',');
+        
+        // Get all related orders for these instances (both original purchase and renewals)
+        const historySql = `
+            SELECT o.*
+            FROM orders o
+            WHERE o.type = 'nodeverse_vps'
+            AND (
+                o.id IN (SELECT order_id FROM nodeverse_vps_instances WHERE id IN (${placeholders}))
+                OR o.item_id IN (${placeholders})
+            )
+            ORDER BY o.created_at ASC
+        `;
+        
+        // Duplicate instanceIds for both placeholders groups
+        const allHistory = await query(historySql, [...instanceIds, ...instanceIds.map(String)]);
+
+        rows.forEach(row => {
+            if (row.real_instance_id) {
+                row.history = allHistory
+                    .filter(h => h.id === row.instance_purchase_order_id || h.item_id === String(row.real_instance_id))
+                    .map(h => ({
+                        id: h.id,
+                        action: h.id === row.instance_purchase_order_id ? 'purchase' : 'renewal',
+                        amount: h.amount,
+                        status: h.status,
+                        created_at: h.created_at
+                    }));
+            } else {
+                row.history = [];
+            }
+        });
+    } else {
+        rows.forEach(row => row.history = []);
+    }
 
     return {
         totalRevenue: Number(stats?.totalRevenue) || 0,
@@ -361,25 +430,43 @@ const listNodeverseOrders = async ({ search, page = 1, limit = 10 }) => {
     };
 };
 
-const getOrderByContainerId = async (containerId) => {
-    const sql = `
-        SELECT o.*, 
+const getInstanceWithHistoryByContainerId = async (containerId) => {
+    // 1. Get instance details
+    const instanceSql = `
+        SELECT i.*, 
                u.name as user_name, u.email as user_email,
-               i.billing_months, i.billing_amount,
-               i.container_id, i.container_name, i.container_status,
-               i.device_ip, i.device_hostname
+               p.name as plan_name
         FROM nodeverse_vps_instances i
-        JOIN orders o ON i.order_id = o.id
-        LEFT JOIN users u ON o.user_id = u.id
+        LEFT JOIN users u ON i.user_id = u.id
+        LEFT JOIN nodeverse_vps_plans p ON i.plan_id = p.id
         WHERE i.container_id = ?
     `;
-    const rows = await query(sql, [containerId]);
-    return rows[0] || null;
+    const instances = await query(instanceSql, [containerId]);
+    const instance = instances[0];
+    if (!instance) return null;
+
+    // 2. Get history (all orders for this instance)
+    // - Original purchase order: where id = instance.order_id
+    // - Renewal orders: where item_id = instance.id AND type = 'nodeverse_vps'
+    const historySql = `
+        SELECT o.*, u.name as user_name, u.email as user_email
+        FROM orders o
+        LEFT JOIN users u ON o.user_id = u.id
+        WHERE o.id = ? 
+           OR (o.item_id = CAST(? AS CHAR) AND o.type = 'nodeverse_vps')
+        ORDER BY o.created_at DESC
+    `;
+    const history = await query(historySql, [instance.order_id, instance.id]);
+
+    return {
+        instance,
+        history
+    };
 };
 
 module.exports = {
     listPlans, getPlanById, getPlanByNodeverseDeviceId, upsertPlan, updatePlan,
     createInstance, getInstanceById, listInstances, countInstances, updateInstance,
     getRevenueAndOrdersByAgency, getInstanceByOrderId, getTotalRevenueByAgencies,
-    getGeneralStats, getStatsByDeviceId, listNodeverseOrders, getOrderByContainerId
+    getGeneralStats, getStatsByDeviceId, listNodeverseOrders, getInstanceWithHistoryByContainerId
 };

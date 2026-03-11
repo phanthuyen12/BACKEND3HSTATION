@@ -21,6 +21,16 @@ const env = {
   nodeverse: {
     apiUrl: process.env.NODEVERSE_API_URL || 'https://vps-api.nodeverse.ai/api',
     apiKey: process.env.NODEVERSE_API_KEY || ''
+  },
+  smtp: {
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+    from: process.env.SMTP_FROM || '3HSTATION <noreply@3hstation.com>'
+  },
+  app: {
+    frontendUrl: process.env.APP_FRONTEND_URL || 'http://localhost:3000'
   }
 };
 

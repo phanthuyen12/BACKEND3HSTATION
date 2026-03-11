@@ -35,11 +35,15 @@ const getVpsOrders = asyncHandler(async (req, res) => {
         }
       } else if (order.type === 'nodeverse_vps') {
         const nodeverseModel = require('../../models/vps/nodeverseModel');
-        // Nodeverse instances current API requires query by id, let's fetch all user instances
         const userInstances = await nodeverseModel.listInstances({ userId: order.user_id, limit: 100 });
-        instance = userInstances.find(i => Number(i.order_id) === Number(order.id)) || null;
 
-        if (order.item_id) {
+        // Find instance either by order_id (initial purchase) or by id (renewal where item_id = instance_id)
+        instance = userInstances.find(i => Number(i.order_id) === Number(order.id)) ||
+          userInstances.find(i => Number(i.id) === Number(order.item_id)) || null;
+
+        if (instance) {
+          planInfo = await nodeverseModel.getPlanById(instance.plan_id);
+        } else if (order.item_id) {
           planInfo = await nodeverseModel.getPlanById(order.item_id);
         }
       }
@@ -158,11 +162,16 @@ const getOrderById = asyncHandler(async (req, res) => {
   } else if (order.type === 'nodeverse_vps') {
     const nodeverseModel = require('../../models/vps/nodeverseModel');
     const instances = await nodeverseModel.listInstances({ userId: order.user_id, limit: 100 });
-    const instance = instances.find(i => Number(i.order_id) === Number(order.id)) || null;
 
-    if (order.item_id) {
+    const instance = instances.find(i => Number(i.order_id) === Number(order.id)) ||
+      instances.find(i => Number(i.id) === Number(order.item_id)) || null;
+
+    if (instance) {
+      itemInfo = await nodeverseModel.getPlanById(instance.plan_id);
+    } else if (order.item_id) {
       itemInfo = await nodeverseModel.getPlanById(order.item_id);
     }
+
     return successResponse(res, {
       ...order,
       user: user || null,
@@ -201,11 +210,24 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
 
   const updatedOrder = await orderModel.updateOrder(id, { status });
 
-  // Provisioning logic trigger
-  if (['completed', 'tao-thanh-cong', 'paid'].includes(status)) {
-    console.log('Order status is now active, checking for provisioning:', updatedOrder);
-    if (order.type === 'vps' || order.type === 'nodeverse_vps') {
-      console.log('Triggering provisioning logic for order:', updatedOrder);
+  // Provisioning logic or Renewal logic trigger
+  if (['completed', 'tao-thanh-cong', 'paid'].includes(status) && order.status !== status) {
+    if (order.type === 'nodeverse_vps') {
+      const nodeverseModel = require('../../models/vps/nodeverseModel');
+      // Check if item_id is an instance ID (Renewal)
+      const instance = await nodeverseModel.getInstanceById(order.item_id);
+      if (instance) {
+        console.log('[RENEWAL] Detected renewal order completion. Updating expiry for instance:', instance.id);
+        const nodeverseVpsService = require('../../services/vps/nodeverseVpsService');
+
+        await nodeverseModel.updateInstance(instance.id, {
+          status: 'active'
+        });
+      } else {
+        // New purchase
+        await provisionNodeverseContainer(order, status);
+      }
+    } else if (order.type === 'vps') {
       await provisionNodeverseContainer(order, status);
     }
   }
@@ -216,7 +238,7 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
 /** Private Helper: Hanlde auto-provisioning via Nodeverse Containers API */
 async function provisionNodeverseContainer(order, status) {
   console.log('Provisioning Nodeverse container for order:', order, 'with status:', status);
-  const isVps = order.type === 'vps' ;
+  const isVps = order.type === 'vps';
 
   const nodeverseModel = require('../../models/vps/nodeverseModel');
   const instanceModel = isVps ? require('../../models/vps/instanceModel') : null;

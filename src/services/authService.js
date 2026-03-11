@@ -3,6 +3,7 @@ const userModel = require('../models/userModel');
 const { hashPassword, comparePassword } = require('../utils/password');
 const { signToken } = require('../utils/jwt');
 const crypto = require('crypto');
+const mail = require('../utils/mail');
 
 const buildAuthResponse = (user) => {
   const token = signToken({ userId: user.id, role: user.role });
@@ -155,14 +156,39 @@ const forgotPassword = async (email) => {
     // Don't reveal if email exists for security
     return true;
   }
-  // In a real implementation, send password reset email
+
+  // Generate reset token
+  const token = crypto.randomBytes(32).toString('hex');
+  const expires = new Date(Date.now() + 3600000); // 1 hour from now
+
+  // Save token to database
+  await userModel.updateUser(user.id, {
+    resetPasswordToken: token,
+    resetPasswordExpires: expires
+  });
+
+  // Send email
+  await mail.sendResetPasswordEmail(user.email, token);
+
   return true;
 };
 
 const resetPassword = async (token, newPassword) => {
-  // In a real implementation, verify token and reset password
-  // For now, return error
-  throw ApiError.badRequest('Password reset not implemented');
+  const user = await userModel.getUserByResetToken(token);
+  if (!user) {
+    throw ApiError.badRequest('Liên kết khôi phục mật khẩu không hợp lệ hoặc đã hết hạn');
+  }
+
+  const passwordHash = await hashPassword(newPassword);
+
+  // Update password and clear reset token
+  await userModel.updateUser(user.id, {
+    passwordHash,
+    resetPasswordToken: null,
+    resetPasswordExpires: null
+  });
+
+  return true;
 };
 
 const getProfile = (userId) => userModel.getUserById(userId);

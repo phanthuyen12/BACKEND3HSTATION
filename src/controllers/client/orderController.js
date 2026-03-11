@@ -14,7 +14,7 @@ const getOrderById = asyncHandler(async (req, res) => {
   const userId = req.user.id;
 
   const order = await orderModel.getOrderById(id);
-  
+
   if (!order) {
     throw ApiError.notFound('Order not found');
   }
@@ -32,7 +32,7 @@ const getOrderById = asyncHandler(async (req, res) => {
     // Lấy thông tin VPS instance
     const vpsInstanceModel = require('../../models/vps/instanceModel');
     instanceInfo = await vpsInstanceModel.getInstanceByOrderId(order.id);
-    
+
     // Lấy thông tin plan
     if (order.item_id) {
       const vpsPlanModel = require('../../models/vps/planModel');
@@ -44,13 +44,26 @@ const getOrderById = asyncHandler(async (req, res) => {
     if (order.item_id) {
       itemInfo = await workflowModel.getWorkflowById(order.item_id);
     }
-    
+
     // Lấy download link nếu có
     if (order.download_link) {
       itemInfo = {
         ...itemInfo,
         downloadLink: order.download_link
       };
+    }
+  } else if (order.type === 'nodeverse_vps') {
+    // Lấy thông tin Nodeverse VPS instance
+    const nodeverseModel = require('../../models/vps/nodeverseModel');
+    const instances = await nodeverseModel.listInstances({ userId: userId, limit: 100 });
+
+    instanceInfo = instances.find(i => Number(i.order_id) === Number(id)) ||
+      instances.find(i => Number(i.id) === Number(order.item_id)) || null;
+
+    if (instanceInfo) {
+      itemInfo = await nodeverseModel.getPlanById(instanceInfo.plan_id);
+    } else if (order.item_id) {
+      itemInfo = await nodeverseModel.getPlanById(order.item_id);
     }
   } else if (order.type === 'course') {
     // Lấy thông tin course
@@ -82,7 +95,7 @@ const payOrder = asyncHandler(async (req, res) => {
     try {
       const workflowLinkModel = require('../../models/workflows/workflowLinkModel');
       const availableLink = await workflowLinkModel.getAvailableLink(order.item_id);
-      
+
       if (availableLink) {
         // Assign link cho order này
         await workflowLinkModel.assignLinkToOrder(availableLink.id, order.id, order.user_id);
@@ -98,7 +111,7 @@ const payOrder = asyncHandler(async (req, res) => {
   }
 
   // Đánh dấu đơn hàng đã thanh toán
-  const updatedOrder = await orderModel.updateOrder(id, { 
+  const updatedOrder = await orderModel.updateOrder(id, {
     status: 'paid',
     downloadLink: downloadLink
   });
@@ -116,12 +129,12 @@ const payOrder = asyncHandler(async (req, res) => {
     console.error('Referral commission error:', e);
   }
 
-  return successResponse(res, { 
-    data: { 
-      id: updatedOrder.id, 
+  return successResponse(res, {
+    data: {
+      id: updatedOrder.id,
       status: updatedOrder.status,
       downloadLink: downloadLink || updatedOrder.download_link
-    } 
+    }
   });
 });
 

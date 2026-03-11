@@ -98,16 +98,55 @@ const manageContainerState = asyncHandler(async (req, res) => {
     return successResponse(res, data, data.message);
 });
 
+/** POST /api/client/vps/nodeverse-plans/my-orders/:id/renew — Gia hạn VPS Nodeverse */
+const renewOrder = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { billingTermCode, paymentMethod } = req.body;
+
+    const data = await nodeverseVpsService.renewOrder({
+        userId: req.user.id,
+        instanceId: id,
+        billingTermCode,
+        paymentMethod
+    });
+    return successResponse(res, data, 'Gia hạn VPS Nodeverse thành công');
+});
+
+/** PUT /api/vps/nodeverse-plans/instances/:id — Cập nhật instance (admin) */
+const adminUpdateInstance = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const data = await nodeverseVpsService.adminUpdateInstance(id, req.body);
+    return successResponse(res, data, 'Đã cập nhật VPS instance');
+});
+
+/** GET /api/vps/nodeverse-plans/instances/:id — Lấy chi tiết instance (admin) */
+const adminGetInstanceDetail = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const data = await nodeverseVpsService.adminGetInstanceDetail(id);
+    return successResponse(res, data);
+});
+
+/** GET /api/vps/nodeverse-plans/instances/:id/history — Lấy lịch sử gia hạn VPS (admin) */
+const adminGetInstanceHistory = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const data = await nodeverseVpsService.adminGetInstanceHistory(id);
+    return successResponse(res, data);
+});
+
 module.exports = {
     syncPlans,
     adminListPlans,
     adminUpdatePlan,
     adminListInstances,
+    adminUpdateInstance,
+    adminGetInstanceDetail,
+    adminGetInstanceHistory,
     adminGetGeneralStats,
     adminGetStatsByDeviceId,
     clientListPlans,
     getPlanPricing,
     createOrder,
+    renewOrder,
     getMyOrders,
     getMyOrderById,
     manageContainerState

@@ -12,6 +12,9 @@ router.get('/my-orders', authenticate, ctrl.getMyOrders);
 // GET /api/client/vps/nodeverse-plans/my-orders/:id — Chi tiết đơn hàng
 router.get('/my-orders/:id', authenticate, ctrl.getMyOrderById);
 
+// POST /api/client/vps/nodeverse-plans/my-orders/:id/renew — Gia hạn
+router.post('/my-orders/:id/renew', authenticate, ctrl.renewOrder);
+
 // POST /api/client/vps/nodeverse-plans/my-orders/:id/:action — Điều khiển
 router.post('/my-orders/:id/:action', authenticate, ctrl.manageContainerState);
 

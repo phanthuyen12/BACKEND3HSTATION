@@ -14,13 +14,18 @@ const getOrderById = async (id) => {
   return rows[0] || null;
 };
 
-const listOrders = async ({ userId, type, status, limit, offset }) => {
+const listOrders = async ({ userId, type, status, itemId, limit, offset }) => {
   const clauses = [];
   const params = [];
 
   if (userId) {
     clauses.push('user_id = ?');
     params.push(userId);
+  }
+
+  if (itemId) {
+    clauses.push('item_id = ?');
+    params.push(itemId);
   }
 
   if (type) {
