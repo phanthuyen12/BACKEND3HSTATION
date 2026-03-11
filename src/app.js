@@ -12,7 +12,7 @@ app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cors({
-  origin: 'http://localhost:5173', // frontend URL
+  origin: 'https://3hstation.com', // frontend URL
   credentials: true, // nếu dùng cookie
 }));
 app.get('/health', (_req, res) => {
