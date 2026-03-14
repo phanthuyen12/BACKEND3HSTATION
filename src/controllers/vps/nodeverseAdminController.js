@@ -26,22 +26,24 @@ const getOrders = asyncHandler(async (req, res) => {
  * GET /api/admin/nodeverse/orders/container/:containerId
  */
 const getOrderDetailsByContainerId = asyncHandler(async (req, res) => {
-    const { containerId } = req.body;
-    // const { containerId } = req.params;
+    const { containerIds } = req.body;
 
-    if (!containerId) {
-        throw ApiError.badRequest('Container ID is required');
+    if (!Array.isArray(containerIds) || containerIds.length === 0) {
+        throw ApiError.badRequest('containerIds must be a non-empty array');
     }
 
-    const data = await nodeverseModel.getInstanceWithHistoryByContainerId(containerId);
+    const results = await Promise.all(
+        containerIds.map(id =>
+            nodeverseModel.getInstanceWithHistoryByContainerId(id)
+        )
+    );
 
-    if (!data) {
-        throw ApiError.notFound('Không tìm thấy thông tin với container_id này');
-    }
+    const filtered = results.filter(item => item !== null);
 
     res.json({
         success: true,
-        data: data
+        count: filtered.length,
+        data: filtered
     });
 });
 
