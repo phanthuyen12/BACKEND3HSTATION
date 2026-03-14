@@ -26,7 +26,8 @@ const getOrders = asyncHandler(async (req, res) => {
  * GET /api/admin/nodeverse/orders/container/:containerId
  */
 const getOrderDetailsByContainerId = asyncHandler(async (req, res) => {
-    const { containerId } = req.params;
+    const { containerId } = req.body;
+    // const { containerId } = req.params;
 
     if (!containerId) {
         throw ApiError.badRequest('Container ID is required');

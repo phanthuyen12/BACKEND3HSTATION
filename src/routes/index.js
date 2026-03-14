@@ -8,6 +8,8 @@ const elearningCourseRoutes = require('./elearning/courseRoutes');
 const videoRoutes = require('./videoRoutes');
 const courseSectionRoutes = require('./courseSectionRoutes');
 const courseLessonRoutes = require('./courseLessonRoutes');
+const aiVideoRoutes = require('./aiVideoRoutes');
+
 
 // VPS routes
 const vpsPlanRoutes = require('./vps/planRoutes');
@@ -57,6 +59,8 @@ router.use('/elearning/courses', elearningCourseRoutes);
 router.use('/videos', videoRoutes);
 router.use('/elearning', courseSectionRoutes);
 router.use('/elearning', courseLessonRoutes);
+router.use('/ai-videos', aiVideoRoutes);
+
 router.use('/vps/plans', vpsPlanRoutes);
 router.use('/vps/instances', vpsInstanceRoutes);
 router.use('/vps/nodeverse', nodeverseRoutes);

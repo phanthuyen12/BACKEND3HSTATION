@@ -11,6 +11,6 @@ const { authenticateByToken } = require('../middlewares/auth');
 router.get('/orders', authenticateByToken, nodeverseAdminController.getOrders);
 
 // Route check chi tiết đơn hàng theo container_id
-router.get('/orders/container/:containerId', authenticateByToken, nodeverseAdminController.getOrderDetailsByContainerId);
+router.post('/orders/container', authenticateByToken, nodeverseAdminController.getOrderDetailsByContainerId);
 
 module.exports = router;
