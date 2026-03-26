@@ -36,6 +36,7 @@ const documentRoutes = require('./documentRoutes');
 const orderRoutes = require('./orders/orderRoutes');
 const adminOrderRoutes = require('./orders/adminOrderRoutes');
 const configRoutes = require('./configRoutes');
+const toolPackagesRoutes = require('./toolPackagesRoutes');
 
 // Client routes
 const clientElearningRoutes = require('./client/elearningRoutes');
@@ -46,6 +47,7 @@ const clientWorkflowRoutes = require('./client/workflowRoutes');
 const clientTopupRoutes = require('./client/topupRoutes');
 const clientUserRoutes = require('./client/userRoutes');
 const clientOrderRoutes = require('./client/orderRoutes');
+const clientToolKeyRoutes = require('./client/toolKeyRoutes');
 
 const router = express.Router();
 
@@ -74,6 +76,7 @@ router.use('/topups', topupRoutes);
 router.use('/banks', bankRoutes);
 router.use('/documents', documentRoutes);
 router.use('/configs', configRoutes);
+router.use('/admin/tool-packages', toolPackagesRoutes); 
 
 // Client APIs
 router.use('/client/elearning', clientElearningRoutes);
@@ -84,6 +87,7 @@ router.use('/client/workflows', clientWorkflowRoutes);
 router.use('/client/topups', clientTopupRoutes);
 router.use('/client/users', clientUserRoutes);
 router.use('/client/orders', clientOrderRoutes);
+router.use('/client/tool-keys', clientToolKeyRoutes);
 const clientDocumentRoutes = require('./client/documentRoutes');
 router.use('/client/documents', clientDocumentRoutes);
 router.use('/orders', orderRoutes);
