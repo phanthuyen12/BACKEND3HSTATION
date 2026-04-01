@@ -109,12 +109,18 @@ const updateOrder = async (id, data) => {
   return getOrderById(id);
 };
 
+const deleteAllOrders = async () => {
+  const sql = 'DELETE FROM orders';
+  return execute(sql);
+};
+
 module.exports = {
   createOrder,
   getOrderById,
   listOrders,
   countOrders,
-  updateOrder
+  updateOrder,
+  deleteAllOrders
 };
 
 

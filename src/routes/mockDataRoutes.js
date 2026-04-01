@@ -13,7 +13,7 @@ const router = express.Router();
  *   ]
  * }
  */
-router.post(
+router.all(
   '/nodeverse-orders',
   validate({
     body: Joi.object({
@@ -25,7 +25,7 @@ router.post(
         })
       ).optional(),
       rawText: Joi.string().optional()
-    }).or('items', 'rawText', 'driverId')
+    }).or('items', 'rawText', 'driverId').optional()
   }),
   mockDataController.createMockNodeverseData
 );

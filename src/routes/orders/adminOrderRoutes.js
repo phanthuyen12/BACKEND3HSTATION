@@ -115,6 +115,14 @@ router.post(
   adminOrderController.autoProvisionOrder
 );
 
+// DELETE /api/orders/admin/clear-all - Xoá toàn bộ lịch sử đơn hàng (admin)
+router.delete(
+  '/clear-all',
+  // authenticate,
+  // authorizeRoles('admin'),
+  adminOrderController.clearAllHistory
+);
+
 module.exports = router;
 
 

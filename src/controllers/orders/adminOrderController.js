@@ -517,6 +517,12 @@ const addOrderAttachment = asyncHandler(async (req, res) => {
   }, 'Attachment added successfully');
 });
 
+// DELETE /api/orders/admin/clear-all - Xoá toàn bộ lịch sử đơn hàng
+const clearAllHistory = asyncHandler(async (req, res) => {
+  await orderModel.deleteAllOrders();
+  return successResponse(res, null, 'Đã xoá toàn bộ lịch sử đơn hàng thành công');
+});
+
 module.exports = {
   getVpsOrders,
   getWorkflowOrders,
@@ -524,6 +530,7 @@ module.exports = {
   updateOrderStatus,
   updateOrderNotes,
   addOrderAttachment,
-  autoProvisionOrder
+  autoProvisionOrder,
+  clearAllHistory
 };
 
