@@ -102,6 +102,19 @@ router.post(
   adminOrderController.addOrderAttachment
 );
 
+// POST /api/orders/admin/:id/auto-provision - Tự động khởi tạo VPS qua Nodeverse API (admin)
+router.post(
+  '/:id/auto-provision',
+  // authenticate,
+  // authorizeRoles('admin'),
+  validate({
+    params: Joi.object({
+      id: Joi.string().required()
+    })
+  }),
+  adminOrderController.autoProvisionOrder
+);
+
 module.exports = router;
 
 

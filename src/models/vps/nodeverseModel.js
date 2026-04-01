@@ -320,9 +320,9 @@ const listNodeverseOrders = async ({ search, page = 1, limit = 10 }) => {
     const params = [];
 
     if (search) {
-        clauses.push("(o.id LIKE ? OR u.name LIKE ? OR u.email LIKE ? OR i1.container_id LIKE ? OR i2.container_id LIKE ? OR i1.device_name LIKE ? OR i2.device_name LIKE ?)");
+        clauses.push("(o.id LIKE ? OR u.name LIKE ? OR u.email LIKE ? OR i1.container_id LIKE ? OR i2.container_id LIKE ? OR i1.device_name LIKE ? OR i2.device_name LIKE ? OR i1.nodeverse_device_id LIKE ? OR i2.nodeverse_device_id LIKE ?)");
         const searchParam = `%${search}%`;
-        params.push(searchParam, searchParam, searchParam, searchParam, searchParam, searchParam, searchParam);
+        params.push(searchParam, searchParam, searchParam, searchParam, searchParam, searchParam, searchParam, searchParam, searchParam);
     }
 
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';

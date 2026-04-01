@@ -43,8 +43,33 @@ const getVpsOrders = asyncHandler(async (req, res) => {
 
         if (instance) {
           planInfo = await nodeverseModel.getPlanById(instance.plan_id);
+          // Fallback to Standard VPS Plans if not found in Nodeverse Plans (Hybrid context)
+          if (!planInfo) {
+            const vpsPlanModel = require('../../models/vps/planModel');
+            planInfo = await vpsPlanModel.getPlanById(instance.plan_id);
+          }
         } else if (order.item_id) {
+          // If not found in user instances, maybe item_id is direct plan_id (old logic)
           planInfo = await nodeverseModel.getPlanById(order.item_id);
+          
+          // Fallback to Standard VPS Plans
+          if (!planInfo) {
+            const vpsPlanModel = require('../../models/vps/planModel');
+            planInfo = await vpsPlanModel.getPlanById(order.item_id);
+          }
+
+          // If still not found, try if it's an instance_id from any user
+          if (!planInfo) {
+            const instById = await nodeverseModel.getInstanceById(order.item_id);
+            if (instById) {
+              instance = instById;
+              planInfo = await nodeverseModel.getPlanById(instById.plan_id);
+              if (!planInfo) {
+                const vpsPlanModel = require('../../models/vps/planModel');
+                planInfo = await vpsPlanModel.getPlanById(instById.plan_id);
+              }
+            }
+          }
         }
       }
 
@@ -168,8 +193,16 @@ const getOrderById = asyncHandler(async (req, res) => {
 
     if (instance) {
       itemInfo = await nodeverseModel.getPlanById(instance.plan_id);
+      if (!itemInfo) {
+        const vpsPlanModel = require('../../models/vps/planModel');
+        itemInfo = await vpsPlanModel.getPlanById(instance.plan_id);
+      }
     } else if (order.item_id) {
       itemInfo = await nodeverseModel.getPlanById(order.item_id);
+      if (!itemInfo) {
+        const vpsPlanModel = require('../../models/vps/planModel');
+        itemInfo = await vpsPlanModel.getPlanById(order.item_id);
+      }
     }
 
     return successResponse(res, {
@@ -235,6 +268,40 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   return successResponse(res, updatedOrder, 'Order status updated successfully');
 });
 
+// POST /api/orders/admin/:id/auto-provision - Tự động khởi tạo VPS qua Nodeverse API và cập nhật trạng thái
+const autoProvisionOrder = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const order = await orderModel.getOrderById(id);
+
+  if (!order) {
+    throw ApiError.notFound('Order not found');
+  }
+
+  if (order.status === 'completed' || order.status === 'tao-thanh-cong') {
+    throw ApiError.badRequest('Đơn hàng này đã được khởi tạo và hoàn thành');
+  }
+
+  // Check type
+  if (order.type !== 'nodeverse_vps' && order.type !== 'vps') {
+    throw ApiError.badRequest('Loại đơn hàng này không hỗ trợ tự động khởi tạo qua Nodeverse');
+  }
+
+  // 1. Gọi API Nodeverse để khởi tạo container
+  const provisionResult = await provisionNodeverseContainer(order, 'completed');
+
+  if (!provisionResult || provisionResult.error) {
+    throw ApiError.badRequest('Khởi tạo VPS thất bại: ' + (provisionResult?.message || 'Không rõ lỗi'));
+  }
+
+  // 2. Nếu thành công, cập nhật trạng thái đơn hàng sang "completed" (nếu chưa được update trong helper)
+  const updatedOrder = await orderModel.updateOrder(id, { status: 'completed' });
+
+  return successResponse(res, {
+    order: updatedOrder,
+    provision: provisionResult
+  }, 'Đã tự động khởi tạo VPS và hoàn thành đơn hàng thành công');
+});
+
 /** Private Helper: Hanlde auto-provisioning via Nodeverse Containers API */
 async function provisionNodeverseContainer(order, status) {
   console.log('Provisioning Nodeverse container for order:', order, 'with status:', status);
@@ -259,13 +326,36 @@ async function provisionNodeverseContainer(order, status) {
       console.log('Found Nodeverse instance for provisioning:', instances);
     }
     if (!instance) return;
-    const configObj = JSON.parse(instance.configuration);
-    console.log('Parsed instance configuration  for provisioning:', configObj);
-    const cpuVPS = configObj?.cpu || 1;
-    const ramVPS = configObj?.ram || 1;
-    const diskVPS = configObj?.ssd || 10;
-    const vpsDeviceId = configObj?.nodeverse_device_id || null;
-    console.log('Extracted CPU, RAM, Disk for provisioning:', { cpuVPS, ramVPS, diskVPS });
+    const configObj = typeof instance.configuration === 'string' ? JSON.parse(instance.configuration) : (instance.configuration || {});
+    console.log('Parsed instance configuration for provisioning:', configObj);
+    
+    // 1.5. Extract Resource Info
+    const cpuVPS = configObj?.cpu || instance.cpu || 1;
+    const ramVPS = configObj?.ram || instance.ram || 1;
+    const diskVPS = configObj?.ssd || configObj?.storage || instance.storage || 10;
+    
+    // 2. Resolve vpsDeviceId (Crucial for Nodeverse API)
+    let vpsDeviceId = configObj?.nodeverse_device_id || instance.nodeverse_device_id;
+    
+    // If hardware ID is still missing, try to get it from the plan
+    if (!vpsDeviceId && instance.plan_id) {
+      console.log('vpsDeviceId missing, looking up plan:', instance.plan_id);
+      const plan = await nodeverseModel.getPlanById(instance.plan_id);
+      if (plan && plan.nodeverse_device_id) {
+         vpsDeviceId = plan.nodeverse_device_id;
+      }
+    }
+
+    console.log('Final resolved vpsDeviceId for provisioning:', vpsDeviceId);
+
+    if (!vpsDeviceId) {
+      return { error: true, message: 'Không tìm thấy ID thiết bị Nodeverse (vpsDeviceId). Vui lòng cấu hình thiết bị cho gói này hoặc đơn hàng này.' };
+    }
+
+    // Nodeverse API requires vpsDeviceId to be a valid MongoDB ObjectID (24 chars hex)
+    if (typeof vpsDeviceId === 'string' && vpsDeviceId.length !== 24) {
+       console.warn('[Nodeverse Provision] vpsDeviceId might be invalid (not 24 chars):', vpsDeviceId);
+    }
 
     const payload = {
       vpsDeviceId: vpsDeviceId,
@@ -328,6 +418,8 @@ async function provisionNodeverseContainer(order, status) {
         console.log('Updating Nodeverse instance with provisioning results...', { instanceId: instance.id, updateData });
         await nodeverseModel.updateInstance(instance.id, updateData);
       }
+      
+      return { success: true, data: updateData, containerData: data };
     } else {
       // Handle API Error
       console.error('[Nodeverse Container Provision] API Error:', data);
@@ -337,10 +429,12 @@ async function provisionNodeverseContainer(order, status) {
       } else {
         await nodeverseModel.updateInstance(instance.id, { notes: errorNotes });
       }
+      return { error: true, message: data.message || 'API error from Nodeverse', apiResponse: data };
     }
 
   } catch (err) {
     console.error('[Nodeverse Provision Logic] Failed:', err.message);
+    return { error: true, message: err.message };
   }
 }
 
@@ -429,6 +523,7 @@ module.exports = {
   getOrderById,
   updateOrderStatus,
   updateOrderNotes,
-  addOrderAttachment
+  addOrderAttachment,
+  autoProvisionOrder
 };
 

@@ -37,6 +37,7 @@ const orderRoutes = require('./orders/orderRoutes');
 const adminOrderRoutes = require('./orders/adminOrderRoutes');
 const configRoutes = require('./configRoutes');
 const toolPackagesRoutes = require('./toolPackagesRoutes');
+const mockDataRoutes = require('./mockDataRoutes');
 
 // Client routes
 const clientElearningRoutes = require('./client/elearningRoutes');
@@ -92,6 +93,9 @@ const clientDocumentRoutes = require('./client/documentRoutes');
 router.use('/client/documents', clientDocumentRoutes);
 router.use('/orders', orderRoutes);
 router.use('/orders/admin', adminOrderRoutes);
+
+// Admin Tooling / Mocking
+router.use('/admin/mock-data', mockDataRoutes);
 
 module.exports = router;
 
