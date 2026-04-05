@@ -102,27 +102,6 @@ router.post(
   adminOrderController.addOrderAttachment
 );
 
-// POST /api/orders/admin/:id/auto-provision - Tự động khởi tạo VPS qua Nodeverse API (admin)
-router.post(
-  '/:id/auto-provision',
-  // authenticate,
-  // authorizeRoles('admin'),
-  validate({
-    params: Joi.object({
-      id: Joi.string().required()
-    })
-  }),
-  adminOrderController.autoProvisionOrder
-);
-
-// DELETE /api/orders/admin/clear-all - Xoá toàn bộ lịch sử đơn hàng (admin)
-router.delete(
-  '/clear-all',
-  // authenticate,
-  // authorizeRoles('admin'),
-  adminOrderController.clearAllHistory
-);
-
 module.exports = router;
 
 
