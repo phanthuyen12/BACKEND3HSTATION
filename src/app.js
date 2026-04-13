@@ -20,7 +20,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.use(cors({
-  origin: 'http://localhost:5173', // frontend URL
+  origin: 'https://3hstation.com', // frontend URL
   credentials: true, // nếu dùng cookie
 }));
 app.get('/health', (_req, res) => {
