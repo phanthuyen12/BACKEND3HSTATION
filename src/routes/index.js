@@ -50,12 +50,15 @@ const clientUserRoutes = require('./client/userRoutes');
 const clientOrderRoutes = require('./client/orderRoutes');
 const clientToolKeyRoutes = require('./client/toolKeyRoutes');
 
+const dashboardRoutes = require('./dashboardRoutes');
+
 const router = express.Router();
 
 // Authentication
 router.use('/auth', authRoutes);
 
 // Admin APIs
+router.use('/admin/dashboard', dashboardRoutes);
 router.use('/users', userRoutes);
 router.use('/elearning/categories', elearningCategoryRoutes);
 router.use('/elearning/courses', elearningCourseRoutes);

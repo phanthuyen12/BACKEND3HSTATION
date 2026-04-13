@@ -31,19 +31,21 @@ const getPlanByNodeverseDeviceId = async (nodeverse_device_id) => {
 
 const upsertPlan = async (data) => {
     const existing = await getPlanByNodeverseDeviceId(data.nodeverse_device_id);
+    const isActive = data.nodeverse_status === 'online' ? 1 : 0;
+    
     if (existing) {
-        // Update Nodeverse metadata only (không đè giá admin đã cài)
+        // Update Nodeverse metadata + auto show/hide based on online status
         await execute(
             `UPDATE nodeverse_vps_plans SET
         name = ?, ip_address = ?, hostname = ?, operating_system = ?,
         cpu_info = ?, total_memory = ?, disk_space = ?,
-        tag = ?, nodeverse_status = ?, nodeverse_synced_at = NOW(),
+        tag = ?, nodeverse_status = ?, is_active = ?, nodeverse_synced_at = NOW(),
         updated_at = CURRENT_TIMESTAMP
        WHERE nodeverse_device_id = ?`,
             [
                 data.name, data.ip_address, data.hostname, data.operating_system,
                 data.cpu_info, data.total_memory, data.disk_space,
-                data.tag || null, data.nodeverse_status,
+                data.tag || null, data.nodeverse_status, isActive,
                 data.nodeverse_device_id
             ]
         );
@@ -55,12 +57,12 @@ const upsertPlan = async (data) => {
          operating_system, cpu_info, total_memory, disk_space,
          tag, nodeverse_status, nodeverse_synced_at,
          price, unit, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 0, 'VNĐ/tháng', 0)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 0, 'VNĐ/tháng', ?)`,
             [
                 data.nodeverse_device_id, data.nodeverse_agency_id, data.name,
                 data.ip_address, data.hostname, data.operating_system,
                 data.cpu_info, data.total_memory, data.disk_space,
-                data.tag || null, data.nodeverse_status
+                data.tag || null, data.nodeverse_status, isActive
             ]
         );
         return getPlanById(result.insertId);
@@ -195,6 +197,7 @@ const updateInstance = async (id, data) => {
         billing_months: data.billingMonths,
         billing_discount_percent: data.billingDiscountPercent,
         billing_amount: data.billingAmount,
+        is_activation_email_sent: data.is_activation_email_sent,
         configuration: data.configuration ? (typeof data.configuration === 'string' ? data.configuration : JSON.stringify(data.configuration)) : undefined
     };
     Object.entries(mapping)

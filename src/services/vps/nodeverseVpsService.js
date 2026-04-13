@@ -732,6 +732,46 @@ const adminGetInstanceHistory = async (id) => {
   return history.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 };
 
+const sendActivationEmail = async (instanceId) => {
+  const instance = await nodeverseModel.getInstanceById(instanceId);
+  if (!instance) throw ApiError.notFound("Không tìm thấy VPS");
+
+  const containerId = instance.container_id || instance.configuration?.container_data?._id;
+  if (!containerId) {
+    throw ApiError.badRequest("Không tìm thấy Container ID để gửi email kích hoạt");
+  }
+
+  const payload = {
+    to: instance.user_email || instance.user?.email,
+    containerId: containerId,
+    price: parseFloat(instance.billing_amount || 0)
+  };
+
+  if (!payload.to) {
+    throw ApiError.badRequest("Không tìm thấy email người nhận");
+  }
+
+  console.log(`[Email] Đang gửi email kích hoạt cho ${payload.to} (Container: ${containerId})`);
+  
+  try {
+    // POST /api/vps/email/vps-activation
+    await callNodeverseApi('/vps/email/vps-activation', {
+      method: 'POST',
+      body: payload
+    });
+
+    // Cập nhật trạng thái đã gửi trong DB
+    await nodeverseModel.updateInstance(instanceId, {
+      is_activation_email_sent: 1
+    });
+
+    return { success: true, message: "Đã gửi email kích hoạt thành công" };
+  } catch (err) {
+    console.error(`[Email] Lỗi khi gửi email kích hoạt:`, err.message);
+    throw ApiError.badRequest(`Gửi email thất bại: ${err.message}`);
+  }
+};
+
 module.exports = {
   BILLING_TERMS,
   syncDevicesFromNodeverse,
@@ -750,5 +790,6 @@ module.exports = {
   adminListInstances,
   adminGetGeneralStats,
   adminGetStatsByDeviceId,
+  sendActivationEmail
 };
 

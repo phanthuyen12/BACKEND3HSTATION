@@ -96,4 +96,13 @@ router.get(
     ctrl.adminGetInstanceHistory
 );
 
+// POST /api/vps/nodeverse-plans/instances/:id/send-activation-email — Gửi email kích hoạt (admin)
+router.post(
+    '/instances/:id/send-activation-email',
+    authenticate,
+    authorizeRoles('admin'),
+    validate({ params: Joi.object({ id: Joi.string().required() }) }),
+    ctrl.adminSendActivationEmail
+);
+
 module.exports = router;

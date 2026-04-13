@@ -14,71 +14,95 @@ const getOrderById = async (id) => {
   return rows[0] || null;
 };
 
-const listOrders = async ({ userId, type, status, itemId, limit, offset }) => {
+const listOrders = async ({ userId, type, status, itemId, limit, offset, search }) => {
   const clauses = [];
   const params = [];
 
   if (userId) {
-    clauses.push('user_id = ?');
+    clauses.push('o.user_id = ?');
     params.push(userId);
   }
 
   if (itemId) {
-    clauses.push('item_id = ?');
+    clauses.push('o.item_id = ?');
     params.push(itemId);
   }
 
   if (type) {
     if (Array.isArray(type)) {
       if (type.length > 0) {
-        clauses.push(`type IN (${type.map(() => '?').join(', ')})`);
+        clauses.push(`o.type IN (${type.map(() => '?').join(', ')})`);
         params.push(...type);
       }
     } else {
-      clauses.push('type = ?');
+      clauses.push('o.type = ?');
       params.push(type);
     }
   }
 
   if (status) {
-    clauses.push('status = ?');
+    clauses.push('o.status = ?');
     params.push(status);
   }
 
+  if (search) {
+    clauses.push('(o.id LIKE ? OR u.email LIKE ? OR u.name LIKE ?)');
+    const term = `%${search}%`;
+    params.push(term, term, term);
+  }
+
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  const sql = `SELECT * FROM orders ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+  const sql = `
+    SELECT o.* FROM orders o
+    LEFT JOIN users u ON o.user_id = u.id
+    ${where} 
+    ORDER BY o.created_at DESC 
+    LIMIT ? OFFSET ?
+  `;
   params.push(limit, offset);
   return query(sql, params);
 };
 
-const countOrders = async ({ userId, type, status }) => {
+const countOrders = async ({ userId, type, status, search }) => {
   const clauses = [];
   const params = [];
 
   if (userId) {
-    clauses.push('user_id = ?');
+    clauses.push('o.user_id = ?');
     params.push(userId);
   }
 
   if (type) {
     if (Array.isArray(type)) {
       if (type.length > 0) {
-        clauses.push(`type IN (${type.map(() => '?').join(', ')})`);
+        clauses.push(`o.type IN (${type.map(() => '?').join(', ')})`);
         params.push(...type);
       }
     } else {
-      clauses.push('type = ?');
+      clauses.push('o.type = ?');
       params.push(type);
     }
   }
 
   if (status) {
-    clauses.push('status = ?');
+    clauses.push('o.status = ?');
     params.push(status);
   }
 
+  if (search) {
+    clauses.push('(o.id LIKE ? OR u.email LIKE ? OR u.name LIKE ?)');
+    const term = `%${search}%`;
+    params.push(term, term, term);
+  }
+
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  const rows = await query(`SELECT COUNT(*) as total FROM orders ${where}`, params);
+  const sql = `
+    SELECT COUNT(*) as total 
+    FROM orders o
+    LEFT JOIN users u ON o.user_id = u.id
+    ${where}
+  `;
+  const rows = await query(sql, params);
   return rows[0]?.total || 0;
 };
 

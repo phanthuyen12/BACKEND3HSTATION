@@ -12,6 +12,7 @@ const getVpsOrders = asyncHandler(async (req, res) => {
   const orders = await orderModel.listOrders({
     type: ['vps', 'nodeverse_vps'],
     status,
+    search,
     limit: take,
     offset
   });
@@ -89,7 +90,8 @@ const getVpsOrders = asyncHandler(async (req, res) => {
 
   const total = await orderModel.countOrders({
     type: ['vps', 'nodeverse_vps'],
-    status
+    status,
+    search
   });
 
   return successResponse(res, {
@@ -111,6 +113,7 @@ const getWorkflowOrders = asyncHandler(async (req, res) => {
   const orders = await orderModel.listOrders({
     type: 'workflow',
     status,
+    search,
     limit: take,
     offset
   });
@@ -143,7 +146,8 @@ const getWorkflowOrders = asyncHandler(async (req, res) => {
 
   const total = await orderModel.countOrders({
     type: 'workflow',
-    status
+    status,
+    search
   });
 
   return successResponse(res, {
@@ -360,6 +364,14 @@ async function provisionNodeverseContainer(order, status) {
       } else {
         console.log('Updating Nodeverse instance with provisioning results...', { instanceId: instance.id, updateData });
         await nodeverseModel.updateInstance(instance.id, updateData);
+        // Tự động gửi email kích hoạt cho Nodeverse VPS
+        try {
+          const nodeverseVpsService = require('../../services/vps/nodeverseVpsService');
+          await nodeverseVpsService.sendActivationEmail(instance.id);
+          console.log(`[Provision] Tự động gửi email kích hoạt thành công cho instance: ${instance.id}`);
+        } catch (err) {
+          console.error(`[Provision] Lỗi khi tự động gửi email kích hoạt:`, err.message);
+        }
       }
     } else {
       // Handle API Error
