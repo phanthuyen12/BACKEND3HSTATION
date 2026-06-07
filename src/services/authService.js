@@ -4,9 +4,10 @@ const { hashPassword, comparePassword } = require('../utils/password');
 const { signToken } = require('../utils/jwt');
 const crypto = require('crypto');
 const mail = require('../utils/mail');
+const sessionService = require('./sessionService');
 
-const buildAuthResponse = (user) => {
-  const token = signToken({ userId: user.id, role: user.role });
+const buildAuthResponse = (user, sessionId) => {
+  const token = signToken({ userId: user.id, role: user.role, sessionId });
   return {
     token,
     user: {
@@ -111,7 +112,8 @@ const register = async ({ name, email, password, phone, ref }) => {
     console.log('[REGISTER] No refByUser, skipping ref_count increment. refByUser:', refByUser);
   }
 
-  return buildAuthResponse(userWithRef);
+  const sessionId = sessionService.createSession(userWithRef.id);
+  return buildAuthResponse(userWithRef, sessionId);
 };
 
 const login = async ({ email, password }) => {
@@ -135,12 +137,12 @@ const login = async ({ email, password }) => {
     userWithRef = await userModel.updateUser(user.id, updates);
   }
 
-  return buildAuthResponse(userWithRef);
+  const sessionId = sessionService.createSession(userWithRef.id);
+  return buildAuthResponse(userWithRef, sessionId);
 };
 
-const logout = async (userId) => {
-  // In a real implementation, you might want to blacklist the token
-  // For now, just return success
+const logout = async (userId, sessionId) => {
+  sessionService.clearSession(userId, sessionId);
   return true;
 };
 
@@ -202,8 +204,6 @@ module.exports = {
   resetPassword,
   getProfile
 };
-
-
 
 
 

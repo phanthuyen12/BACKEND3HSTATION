@@ -15,7 +15,7 @@ const login = asyncHandler(async (req, res) => {
 });
 
 const logout = asyncHandler(async (req, res) => {
-  await authService.logout(req.user.id);
+  await authService.logout(req.user.id, req.sessionId);
   return successResponse(res, {}, 'Logout success');
 });
 
@@ -42,7 +42,6 @@ module.exports = {
   forgotPassword,
   resetPassword
 };
-
 
 
 

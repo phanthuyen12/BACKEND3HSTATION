@@ -674,6 +674,21 @@ const adminUpdateInstance = async (id, data) => {
     configuration: data.configuration
   });
 
+  // Auto-send activation email if containerId is present and status is active
+  const updatedInstance = await nodeverseModel.getInstanceById(id);
+  const containerId = updatedInstance.container_id || (typeof updatedInstance.configuration === 'object' ? updatedInstance.configuration?.container_data?._id : null);
+  
+  if (containerId && 
+      ['active', 'tao-thanh-cong', 'completed'].includes(data.status) && 
+      !updatedInstance.is_activation_email_sent) {
+    try {
+      await sendActivationEmail(id);
+      console.log(`[Auto-Email] Successfully sent instant activation email for instance ${id}`);
+    } catch (err) {
+      console.error(`[Auto-Email] Failed to send instant activation email for instance ${id}:`, err.message);
+    }
+  }
+
   return updated;
 };
 
@@ -772,6 +787,73 @@ const sendActivationEmail = async (instanceId) => {
   }
 };
 
+const sendBulkActivationEmails = async () => {
+  try {
+    // Lấy tối đa 500 bản ghi đang chờ gửi mail
+    const pending = await nodeverseModel.getPendingActivationEmails(500);
+    
+    if (!pending || pending.length === 0) {
+      return { 
+        success: true, 
+        message: "Không có VPS nào đang ở trạng thái chờ gửi email kích hoạt",
+        total: 0,
+        successCount: 0,
+        failCount: 0
+      };
+    }
+
+    console.log(`[Bulk-Email] Bắt đầu gửi email cho ${pending.length} instances...`);
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const item of pending) {
+      try {
+        await sendActivationEmail(item.id);
+        successCount++;
+      } catch (err) {
+        failCount++;
+        console.error(`[Bulk-Email] Lỗi khi gửi cho instance ${item.id}:`, err.message);
+      }
+    }
+    
+    return { 
+      success: true, 
+      message: `Đã hoàn tất gửi email hàng loạt cho ${pending.length} VPS`,
+      total: pending.length,
+      successCount, 
+      failCount 
+    };
+  } catch (err) {
+    console.error(`[Bulk-Email] Lỗi hệ thống khi gửi mail hàng loạt:`, err.message);
+    throw ApiError.badRequest(`Gửi mail hàng loạt thất bại: ${err.message}`);
+  }
+};
+
+const processPendingEmailNotifications = async () => {
+  try {
+    const pending = await nodeverseModel.getPendingActivationEmails(20);
+    if (!pending.length) return { processed: 0 };
+
+    console.log(`[Auto-Email] Found ${pending.length} pending activation emails to process`);
+    
+    let successCount = 0;
+    for (const item of pending) {
+      try {
+        await sendActivationEmail(item.id);
+        successCount++;
+      } catch (err) {
+        console.error(`[Auto-Email] Error processing instance ${item.id}:`, err.message);
+      }
+    }
+    
+    return { processed: pending.length, success: successCount };
+  } catch (err) {
+    console.error(`[Auto-Email] Fatal error in processPendingEmailNotifications:`, err.message);
+    return { error: err.message };
+  }
+};
+
 module.exports = {
   BILLING_TERMS,
   syncDevicesFromNodeverse,
@@ -790,6 +872,9 @@ module.exports = {
   adminListInstances,
   adminGetGeneralStats,
   adminGetStatsByDeviceId,
-  sendActivationEmail
+  sendActivationEmail,
+  sendBulkActivationEmails,
+  processPendingEmailNotifications
 };
+
 

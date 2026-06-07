@@ -467,9 +467,21 @@ const getInstanceWithHistoryByContainerId = async (containerId) => {
     };
 };
 
+const getPendingActivationEmails = async (limit = 10) => {
+    return query(
+        `SELECT id FROM nodeverse_vps_instances 
+         WHERE (status IN ('active', 'tao-thanh-cong', 'completed', 'paid'))
+         AND container_id IS NOT NULL 
+         AND (is_activation_email_sent IS NULL OR is_activation_email_sent = 0)
+         LIMIT ?`,
+        [limit]
+    );
+};
+
 module.exports = {
     listPlans, getPlanById, getPlanByNodeverseDeviceId, upsertPlan, updatePlan,
     createInstance, getInstanceById, listInstances, countInstances, updateInstance,
     getRevenueAndOrdersByAgency, getInstanceByOrderId, getTotalRevenueByAgencies,
-    getGeneralStats, getStatsByDeviceId, listNodeverseOrders, getInstanceWithHistoryByContainerId
+    getGeneralStats, getStatsByDeviceId, listNodeverseOrders, getInstanceWithHistoryByContainerId,
+    getPendingActivationEmails
 };

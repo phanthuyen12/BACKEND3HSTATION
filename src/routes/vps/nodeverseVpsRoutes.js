@@ -105,4 +105,13 @@ router.post(
     ctrl.adminSendActivationEmail
 );
 
+// POST /api/vps/nodeverse-plans/instances/send-bulk-activation-email — Gửi email kích hoạt hàng loạt (admin)
+router.post(
+    '/instances/send-bulk-activation-email',
+    authenticate,
+    authorizeRoles('admin'),
+    ctrl.adminSendBulkActivationEmails
+);
+
 module.exports = router;
+

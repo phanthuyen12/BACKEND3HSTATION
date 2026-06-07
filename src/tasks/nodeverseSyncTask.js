@@ -20,7 +20,7 @@ const startNodeverseSyncTask = () => {
         }
     }, 30000);
 
-    // Lên lịch chạy định kỳ
+    // Lên lịch chạy định kỳ (5 tiếng sync devices một lần)
     setInterval(async () => {
         try {
             console.log('[Task] Đang thực hiện Nodeverse Sync định kỳ...');
@@ -30,6 +30,20 @@ const startNodeverseSyncTask = () => {
             console.error('[Task] Nodeverse Sync thất bại:', err.message);
         }
     }, FIVE_HOURS);
+
+    // Lên lịch chạy định kỳ check email (gửi email cho những đơn hàng vừa được kích hoạt)
+    // Chạy mỗi 1 phút
+    const ONE_MINUTE = 60 * 1000;
+    setInterval(async () => {
+        try {
+            const result = await nodeverseVpsService.processPendingEmailNotifications();
+            if (result.processed > 0) {
+                console.log(`[Task] Auto-Activation-Email thành công: ${result.success}/${result.processed}`);
+            }
+        } catch (err) {
+            console.error('[Task] Auto-Activation-Email thất bại:', err.message);
+        }
+    }, ONE_MINUTE);
 };
 
 module.exports = { startNodeverseSyncTask };

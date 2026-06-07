@@ -2,6 +2,7 @@ const ApiError = require('../utils/apiError');
 const asyncHandler = require('../utils/asyncHandler');
 const { verifyToken } = require('../utils/jwt');
 const userService = require('../services/userService');
+const sessionService = require('../services/sessionService');
 
 const authenticate = asyncHandler(async (req, _res, next) => {
   const header = req.headers.authorization;
@@ -18,6 +19,10 @@ const authenticate = asyncHandler(async (req, _res, next) => {
     throw ApiError.unauthorized('Invalid or expired token');
   }
 
+  if (!sessionService.isSessionActive(decoded.userId, decoded.sessionId)) {
+    throw ApiError.unauthorized('Session expired because the account signed in on another device');
+  }
+
   const user = await userService.getUserById(decoded.userId);
 
   if (!user) {
@@ -25,6 +30,7 @@ const authenticate = asyncHandler(async (req, _res, next) => {
   }
 
   req.user = user;
+  req.sessionId = decoded.sessionId;
   next();
 });
 
@@ -34,9 +40,13 @@ const optionalAuth = asyncHandler(async (req, _res, next) => {
     const token = header.split(' ')[1];
     try {
       const decoded = verifyToken(token);
+      if (!sessionService.isSessionActive(decoded.userId, decoded.sessionId)) {
+        return next();
+      }
       const user = await userService.getUserById(decoded.userId);
       if (user) {
         req.user = user;
+        req.sessionId = decoded.sessionId;
       }
     } catch (error) {
       // ignore invalid token for optional auth
@@ -84,4 +94,3 @@ module.exports = {
   authorizeRoles,
   authenticateByToken
 };
-

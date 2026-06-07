@@ -140,6 +140,13 @@ const adminSendActivationEmail = asyncHandler(async (req, res) => {
     return successResponse(res, data, 'Đã gửi email kích hoạt VPS');
 });
 
+/** POST /api/vps/nodeverse-plans/instances/send-bulk-activation-email — Gửi email kích hoạt hàng loạt */
+const adminSendBulkActivationEmails = asyncHandler(async (req, res) => {
+    const data = await nodeverseVpsService.sendBulkActivationEmails();
+    return successResponse(res, data, data.message);
+});
+
+
 module.exports = {
     syncPlans,
     adminListPlans,
@@ -149,6 +156,7 @@ module.exports = {
     adminGetInstanceDetail,
     adminGetInstanceHistory,
     adminSendActivationEmail,
+    adminSendBulkActivationEmails,
     adminGetGeneralStats,
     adminGetStatsByDeviceId,
     clientListPlans,
@@ -159,3 +167,4 @@ module.exports = {
     getMyOrderById,
     manageContainerState
 };
+

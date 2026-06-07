@@ -20,7 +20,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.use(cors({
-  origin: 'https://3hstation.com', // frontend URL
+  origin: 'https://academy.aetrading.vn/', // frontend URL
   credentials: true, // nếu dùng cookie
 }));
 app.get('/health', (_req, res) => {
