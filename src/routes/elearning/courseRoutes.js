@@ -48,7 +48,7 @@ router.post(
       description: Joi.string().required(),
       categoryId: Joi.string().required(),
       thumbnail: Joi.string().allow('', null).optional(),
-      price: Joi.string().required(),
+      price: Joi.string().allow('', null).optional(),
       level: Joi.string().valid('beginner', 'intermediate', 'advanced').optional(),
       duration: Joi.string().optional(),
       lessons: Joi.number().integer().min(0).optional(),
@@ -182,7 +182,6 @@ router.delete(
 );
 
 module.exports = router;
-
 
 
 
