@@ -2,7 +2,8 @@ const ApiError = require('../utils/apiError');
 const courseModel = require('../models/courseModel');
 const videoModel = require('../models/videoModel');
 const courseSectionModel = require('../models/courseSectionModel');
-const userCourseModel = require('../models/userCourseModel');
+const rankCourseModel = require('../models/rankCourseModel');
+const { isPrivilegedRole } = require('../utils/roles');
 
 const canAccessCourseVideos = async (courseId, user) => {
   const course = await courseModel.getCourseById(courseId);
@@ -11,7 +12,7 @@ const canAccessCourseVideos = async (courseId, user) => {
   }
 
   // Admin luôn có quyền xem tất cả
-  if (user && user.role === 'admin') {
+  if (user && isPrivilegedRole(user.role)) {
     return { course, canViewFull: true };
   }
 
@@ -25,9 +26,15 @@ const canAccessCourseVideos = async (courseId, user) => {
     return { course, canViewFull: false };
   }
 
-  // Kiểm tra user có sở hữu course không
-  const ownership = await userCourseModel.userHasActiveCourse(user.id, courseId);
-  return { course, canViewFull: Boolean(ownership) };
+  if (!user.rank_id) {
+    return { course, canViewFull: false };
+  }
+
+  const allowed = await rankCourseModel.isCourseAllowedForRank({
+    rankId: user.rank_id,
+    courseId
+  });
+  return { course, canViewFull: Boolean(allowed) };
 };
 
 const listCourseVideos = async (courseId, user, { sectionId = null, categoryId = null } = {}) => {
@@ -158,15 +165,3 @@ module.exports = {
   updateVideo,
   deleteVideo
 };
-
-
-
-
-
-
-
-
-
-
-
-

@@ -2,10 +2,11 @@ const ApiError = require('../utils/apiError');
 const courseModel = require('../models/courseModel');
 const videoModel = require('../models/videoModel');
 const documentModel = require('../models/documentModel');
-const userCourseModel = require('../models/userCourseModel');
 const courseSectionModel = require('../models/courseSectionModel');
 const courseLessonModel = require('../models/courseLessonModel');
+const rankCourseModel = require('../models/rankCourseModel');
 const { buildPagination } = require('../utils/pagination');
+const { isPrivilegedRole } = require('../utils/roles');
 
 const normalizeFreeFilter = (value) => {
   if (value === undefined || value === null) return undefined;
@@ -47,10 +48,12 @@ const canViewPaidCourse = async (course, user) => {
   if (!course) return false;
   if (course.is_free) return true;
   if (!user) return false;
-  if (user.role === 'admin') return true;
-
-  const ownership = await userCourseModel.userHasActiveCourse(user.id, course.id);
-  return Boolean(ownership);
+  if (isPrivilegedRole(user.role)) return true;
+  if (!user.rank_id) return false;
+  return rankCourseModel.isCourseAllowedForRank({
+    rankId: user.rank_id,
+    courseId: course.id
+  });
 };
 
 const getCourseDetail = async ({ courseId, user }) => {
@@ -127,4 +130,3 @@ module.exports = {
   updateCourse,
   deleteCourse
 };
-

@@ -5,6 +5,7 @@ const { signToken } = require('../utils/jwt');
 const crypto = require('crypto');
 const mail = require('../utils/mail');
 const sessionService = require('./sessionService');
+const { normalizeRole } = require('../utils/roles');
 
 const buildAuthResponse = (user, sessionId) => {
   const token = signToken({ userId: user.id, role: user.role, sessionId });
@@ -14,7 +15,14 @@ const buildAuthResponse = (user, sessionId) => {
       id: String(user.id),
       name: user.name,
       email: user.email,
-      role: user.role,
+      role: normalizeRole(user.role),
+      rank: user.rank_id ? {
+        id: String(user.rank_id),
+        code: user.rank_code || null,
+        name: user.rank_name || null,
+        description: user.rank_description || null,
+        status: user.rank_status || null
+      } : null,
       refCode: user.ref_code || null,
       refBy: user.ref_by || null,
       refCount: user.ref_count || 0,
@@ -35,89 +43,11 @@ const generateRefCode = (userId) => {
 };
 
 const register = async ({ name, email, password, phone, ref }) => {
-  const existing = await userModel.getUserByEmail(email);
-  if (existing) {
-    throw ApiError.badRequest('Email already exists');
-  }
-
-  const passwordHash = await hashPassword(password);
-  let refByUser = null;
-
-  if (ref) {
-    // ref có thể là ref_code hoặc email
-    ref = String(ref).trim();
-    if (ref) {
-      console.log('[REGISTER] Looking for ref:', ref, '(type:', typeof ref, ')');
-      // Ưu tiên tìm theo ref_code
-      refByUser = await userModel.getUserByRefCode(ref);
-      console.log('[REGISTER] getUserByRefCode result:', refByUser ? `Found user ${refByUser.id}` : 'Not found');
-
-      if (!refByUser) {
-        // fallback: nếu ref là email
-        console.log('[REGISTER] Trying to find by email:', ref);
-        refByUser = await userModel.getUserByEmail(ref);
-        console.log('[REGISTER] getUserByEmail result:', refByUser ? `Found user ${refByUser.id}` : 'Not found');
-      }
-
-      if (refByUser) {
-        console.log('[REGISTER] Found ref user:', {
-          id: refByUser.id,
-          email: refByUser.email,
-          ref_code: refByUser.ref_code,
-          ref_count: refByUser.ref_count
-        });
-      } else {
-        console.log('[REGISTER] ❌ Ref user not found for:', ref);
-        console.log('[REGISTER] This means ref_by will be NULL');
-      }
-    }
-  }
-
-  // Tạo user với ref_code tạm thời (sẽ update sau khi có id)
-  const refByUserId = refByUser ? parseInt(refByUser.id, 10) : null;
-  console.log('[REGISTER] Creating user with ref_by:', refByUserId, '(type:', typeof refByUserId, ')');
-
-  const createdUser = await userModel.createUser({
-    name,
-    email,
-    passwordHash,
-    phone,
-    refCode: null,
-    refBy: refByUserId
-  });
-
-  console.log('[REGISTER] Created user:', createdUser.id, 'ref_by:', createdUser.ref_by, '(type:', typeof createdUser.ref_by, ')');
-
-  // Generate ref_code & api_token dựa trên id user vừa tạo
-  const refCode = generateRefCode(createdUser.id);
-  const apiToken = generateApiToken();
-  const userWithRef = await userModel.updateUser(createdUser.id, {
-    refCode,
-    apiToken
-  });
-
-  // Nếu có người giới thiệu, tăng ref_count của họ
-  if (refByUser && refByUser.id) {
-    try {
-      const refByUserId = parseInt(refByUser.id, 10);
-      console.log('[REGISTER] Incrementing ref_count for user:', refByUserId, 'current ref_count:', refByUser.ref_count || 0);
-      // Tăng ref_count (không tăng commission vì chưa có giao dịch)
-      const updatedRefUser = await userModel.incrementRefCount(refByUserId);
-      console.log('[REGISTER] Successfully incremented ref_count. New ref_count:', updatedRefUser.ref_count);
-    } catch (error) {
-      // Log lỗi nhưng không làm fail registration
-      console.error('[REGISTER] Error incrementing ref_count:', error.message, error.stack);
-    }
-  } else {
-    console.log('[REGISTER] No refByUser, skipping ref_count increment. refByUser:', refByUser);
-  }
-
-  const sessionId = sessionService.createSession(userWithRef.id);
-  return buildAuthResponse(userWithRef, sessionId);
+  throw ApiError.forbidden('Self-registration is disabled. Accounts are created by admin.');
 };
 
 const login = async ({ email, password }) => {
-  const user = await userModel.getUserByEmail(email);
+  const user = await userModel.getUserByEmailWithPassword(email);
   if (!user) {
     throw ApiError.unauthorized('Invalid credentials');
   }
@@ -125,6 +55,10 @@ const login = async ({ email, password }) => {
   const isMatch = await comparePassword(password, user.password_hash);
   if (!isMatch) {
     throw ApiError.unauthorized('Invalid credentials');
+  }
+
+  if (user.status !== 'active') {
+    throw ApiError.forbidden('Account is locked');
   }
 
   // Nếu user chưa có ref_code hoặc api_token, tạo mới
@@ -135,6 +69,8 @@ const login = async ({ email, password }) => {
 
   if (Object.keys(updates).length > 0) {
     userWithRef = await userModel.updateUser(user.id, updates);
+  } else {
+    userWithRef = await userModel.getUserById(user.id);
   }
 
   const sessionId = sessionService.createSession(userWithRef.id);
@@ -204,6 +140,3 @@ module.exports = {
   resetPassword,
   getProfile
 };
-
-
-

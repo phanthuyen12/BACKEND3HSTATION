@@ -7,13 +7,14 @@ const listCourses = asyncHandler(async (req, res) => {
     page: req.query.page,
     limit: req.query.limit,
     search: req.query.search,
-    category: req.query.category
+    category: req.query.category,
+    user: req.user || null
   });
   return successResponse(res, data);
 });
 
 const getCourseById = asyncHandler(async (req, res) => {
-  const data = await elearningService.getCourseById(req.params.id);
+  const data = await elearningService.getCourseById(req.params.id, req.user || null);
   return successResponse(res, { data });
 });
 
@@ -41,14 +42,25 @@ const checkEnrollment = asyncHandler(async (req, res) => {
   return successResponse(res, data);
 });
 
+const getDashboard = asyncHandler(async (req, res) => {
+  const data = await elearningService.getStudentDashboard(req.user.id);
+  return successResponse(res, { data });
+});
+
+const getRankSummary = asyncHandler(async (req, res) => {
+  const data = await elearningService.getRankSummaryForUser(req.user.id);
+  return successResponse(res, { data });
+});
+
 module.exports = {
   listCourses,
   getCourseById,
   listCategories,
   enrollCourse,
-  checkEnrollment
+  checkEnrollment,
+  getDashboard,
+  getRankSummary
 };
-
 
 
 

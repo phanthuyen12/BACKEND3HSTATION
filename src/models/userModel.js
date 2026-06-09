@@ -1,10 +1,38 @@
 const { query, execute } = require('../config/database');
 
+const userSelectFields = `
+  u.id,
+  u.name,
+  u.email,
+  u.phone,
+  u.avatar_url,
+  u.role,
+  u.rank_id,
+  u.balance,
+  u.status,
+  u.address,
+  u.ref_code,
+  u.ref_by,
+  u.ref_count,
+  u.ref_commission,
+  u.api_token,
+  u.created_at,
+  u.updated_at,
+  u.last_login_at,
+  r.code AS rank_code,
+  r.name AS rank_name,
+  r.description AS rank_description,
+  r.status AS rank_status
+`;
+
+const userSelectWithRank = `
+  SELECT ${userSelectFields}
+  FROM users u
+  LEFT JOIN ranks r ON u.rank_id = r.id
+`;
+
 const getUserById = async (id) => {
-  const rows = await query(
-    'SELECT id, name, email, phone, avatar_url, role, balance, status, address, ref_code, ref_by, ref_count, ref_commission, api_token, created_at, updated_at, last_login_at FROM users WHERE id = ?',
-    [id]
-  );
+  const rows = await query(`${userSelectWithRank} WHERE u.id = ?`, [id]);
   return rows[0] || null;
 };
 
@@ -13,20 +41,22 @@ const listUsers = async ({ search, status, limit, offset }) => {
   const params = [];
 
   if (search) {
-    clauses.push('(name LIKE ? OR email LIKE ? OR phone LIKE ?)');
+    clauses.push('(u.name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)');
     params.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
 
   if (status) {
-    clauses.push('status = ?');
+    clauses.push('u.status = ?');
     params.push(status);
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   const sql = `
-    SELECT id, name, email, phone, balance, status, ref_code, ref_by, ref_count, ref_commission, created_at, updated_at, last_login_at 
-    FROM users ${where} 
-    ORDER BY created_at DESC 
+    SELECT ${userSelectFields}
+    FROM users u
+    LEFT JOIN ranks r ON u.rank_id = r.id
+    ${where}
+    ORDER BY u.created_at DESC 
     LIMIT ? OFFSET ?
   `;
   params.push(limit, offset);
@@ -38,31 +68,36 @@ const countUsers = async ({ search, status }) => {
   const params = [];
 
   if (search) {
-    clauses.push('(name LIKE ? OR email LIKE ? OR phone LIKE ?)');
+    clauses.push('(u.name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)');
     params.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
 
   if (status) {
-    clauses.push('status = ?');
+    clauses.push('u.status = ?');
     params.push(status);
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  const rows = await query(`SELECT COUNT(*) as total FROM users ${where}`, params);
+  const rows = await query(`SELECT COUNT(*) as total FROM users u ${where}`, params);
   return rows[0]?.total || 0;
 };
 
-const createUser = async ({ name, email, passwordHash, avatarUrl = null, role = 'user', phone = null, status = 'active', refCode = null, refBy = null, apiToken = null }) => {
+const createUser = async ({ name, email, passwordHash, avatarUrl = null, role = 'user', rankId = null, phone = null, status = 'active', refCode = null, refBy = null, apiToken = null }) => {
   const sql = `
-    INSERT INTO users (name, email, password_hash, avatar_url, role, phone, status, ref_code, ref_by, api_token)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO users (name, email, password_hash, avatar_url, role, rank_id, phone, status, ref_code, ref_by, api_token)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
-  const [result] = await execute(sql, [name, email, passwordHash, avatarUrl, role, phone, status, refCode, refBy, apiToken]);
+  const [result] = await execute(sql, [name, email, passwordHash, avatarUrl, role, rankId, phone, status, refCode, refBy, apiToken]);
   return getUserById(result.insertId);
 };
 
 const getUserByEmail = async (email) => {
-  const rows = await query('SELECT * FROM users WHERE email = ?', [email]);
+  const rows = await query(`${userSelectWithRank} WHERE u.email = ? LIMIT 1`, [email]);
+  return rows[0] || null;
+};
+
+const getUserByEmailWithPassword = async (email) => {
+  const rows = await query('SELECT * FROM users WHERE email = ? LIMIT 1', [email]);
   return rows[0] || null;
 };
 
@@ -89,12 +124,20 @@ const updateUser = async (id, data) => {
     ref_count: data.refCount,
     ref_commission: data.refCommission,
     api_token: data.apiToken,
+    rank_id: data.rankId,
     reset_password_token: data.resetPasswordToken,
     reset_password_expires: data.resetPasswordExpires
   };
 
+  const nullableColumns = new Set([
+    'avatar_url',
+    'rank_id',
+    'reset_password_token',
+    'reset_password_expires'
+  ]);
+
   Object.entries(mapping)
-    .filter(([, value]) => value !== undefined && value !== null)
+    .filter(([, value]) => value !== undefined && (value !== null || nullableColumns.has(column)))
     .forEach(([column, value]) => {
       fields.push(`${column} = ?`);
       values.push(value);
@@ -258,7 +301,7 @@ const incrementRefCountAndCommission = async (userId, commissionAmount) => {
 
 const getUserByApiToken = async (apiToken) => {
   const rows = await query(
-    'SELECT id, name, email, phone, avatar_url, role, balance, status, address, ref_code, ref_by, ref_count, ref_commission, api_token, created_at, updated_at, last_login_at FROM users WHERE api_token = ?',
+    `${userSelectWithRank} WHERE u.api_token = ? LIMIT 1`,
     [apiToken]
   );
   return rows[0] || null;
@@ -266,7 +309,7 @@ const getUserByApiToken = async (apiToken) => {
 
 const getUserByResetToken = async (token) => {
   const rows = await query(
-    'SELECT * FROM users WHERE reset_password_token = ? AND reset_password_expires > NOW() LIMIT 1',
+    `${userSelectWithRank} WHERE u.reset_password_token = ? AND u.reset_password_expires > NOW() LIMIT 1`,
     [token]
   );
   return rows[0] || null;
@@ -275,6 +318,7 @@ const getUserByResetToken = async (token) => {
 module.exports = {
   createUser,
   getUserByEmail,
+  getUserByEmailWithPassword,
   getUserById,
   getUserByIdWithPassword,
   updateUser,
@@ -291,4 +335,3 @@ module.exports = {
   getUserByApiToken,
   getUserByResetToken
 };
-

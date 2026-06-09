@@ -1,6 +1,7 @@
 const express = require('express');
 const authRoutes = require('./authRoutes');
 const userRoutes = require('./userRoutes');
+const rankRoutes = require('./rankRoutes');
 
 // E-Learning routes
 const elearningCategoryRoutes = require('./elearning/categoryRoutes');
@@ -60,6 +61,7 @@ router.use('/auth', authRoutes);
 // Admin APIs
 router.use('/admin/dashboard', dashboardRoutes);
 router.use('/users', userRoutes);
+router.use('/ranks', rankRoutes);
 router.use('/elearning/categories', elearningCategoryRoutes);
 router.use('/elearning/courses', elearningCourseRoutes);
 router.use('/videos', videoRoutes);
@@ -101,7 +103,6 @@ router.use('/orders/admin', adminOrderRoutes);
 router.use('/admin/mock-data', mockDataRoutes);
 
 module.exports = router;
-
 
 
 

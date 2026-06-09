@@ -27,7 +27,7 @@ router.get(
 
 router.get(
   '/:id',
-  // optionalAuth,
+  optionalAuth,
   validate({
     params: Joi.object({
       id: Joi.number().integer().positive().required()
@@ -89,7 +89,7 @@ router.delete(
 
 router.get(
   '/:course_id/videos',
-  // optionalAuth,
+  optionalAuth,
   validate({
     params: Joi.object({
       course_id: Joi.number().integer().positive().required()
@@ -156,4 +156,3 @@ router.delete(
 );
 
 module.exports = router;
-

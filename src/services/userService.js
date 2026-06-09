@@ -1,12 +1,118 @@
 const ApiError = require('../utils/apiError');
 const userModel = require('../models/userModel');
+const rankModel = require('../models/rankModel');
+const rankCourseModel = require('../models/rankCourseModel');
+const courseModel = require('../models/courseModel');
+const courseProgressModel = require('../models/courseProgressModel');
 const { hashPassword, comparePassword } = require('../utils/password');
 const { buildPagination } = require('../utils/pagination');
+const { normalizeRole, isPrivilegedRole } = require('../utils/roles');
 const { query } = require('../config/database');
 const crypto = require('crypto');
 
 const generateApiToken = () => {
   return crypto.randomBytes(32).toString('hex');
+};
+
+const formatRank = (rank) => {
+  if (!rank) return null;
+  return {
+    id: String(rank.id),
+    code: rank.rank_code || rank.code || null,
+    name: rank.rank_name || rank.name || null,
+    description: rank.rank_description || rank.description || null,
+    status: rank.rank_status || rank.status || null
+  };
+};
+
+const getAllowedCoursesForRank = async (rankId) => {
+  if (!rankId) return [];
+  const allowedCourseIds = await rankCourseModel.getAllowedCourseIdsByRankIds([rankId]);
+  if (!allowedCourseIds.length) return [];
+
+  const placeholders = allowedCourseIds.map(() => '?').join(', ');
+  return query(
+    `
+      SELECT
+        c.id,
+        c.title,
+        c.short_description,
+        c.description,
+        c.category_id,
+        c.price,
+        c.thumbnail_url,
+        c.level,
+        c.students,
+        c.rating,
+        c.duration,
+        c.lessons,
+        c.status,
+        c.created_at,
+        c.updated_at,
+        cat.name AS category_name
+      FROM courses c
+      LEFT JOIN categories cat ON c.category_id = cat.id
+      WHERE c.status = 'active'
+        AND c.id IN (${placeholders})
+      ORDER BY c.created_at DESC
+    `,
+    allowedCourseIds
+  );
+};
+
+const buildStudentDashboard = async (user) => {
+  const rank = await rankModel.getRankById(user.rank_id);
+  const allowedCourses = isPrivilegedRole(user.role)
+    ? await courseModel.listCourses({ limit: 10000, offset: 0 })
+    : await getAllowedCoursesForRank(user.rank_id);
+  const inProgressCourses = await courseProgressModel.countInProgressCourses(user.id);
+  const completedCourses = await courseProgressModel.countCompletedCourses(user.id);
+  const completedLessons = await courseProgressModel.countCompletedLessons(user.id);
+  const progressRows = await courseProgressModel.getUserCourseProgress(user.id);
+
+  const progressByCourse = new Map(
+    progressRows.map((row) => [
+      String(row.course_id),
+      {
+        courseId: String(row.course_id),
+        totalLessons: Number(row.total_lessons || 0),
+        completedLessons: Number(row.completed_lessons || 0),
+        lastCompletedAt: row.last_completed_at || null
+      }
+    ])
+  );
+
+  const recommendedCourses = allowedCourses
+    .filter((course) => !progressByCourse.has(String(course.id)) || Number(progressByCourse.get(String(course.id)).completedLessons) < Number(progressByCourse.get(String(course.id)).totalLessons))
+    .slice(0, 6)
+    .map((course) => ({
+      id: String(course.id),
+      title: course.title,
+      category: course.category_name || '',
+      thumbnail: course.thumbnail_url || '',
+      price: String(course.price || 0),
+      status: course.status || 'active'
+    }));
+
+  return {
+    account: {
+      id: String(user.id),
+      name: user.name,
+      email: user.email,
+      rank: formatRank(rank)
+    },
+    stats: {
+      allowedCourses: allowedCourses.length,
+      inProgressCourses,
+      completedCourses,
+      progressRate: allowedCourses.length > 0
+        ? Math.round((completedCourses / allowedCourses.length) * 100)
+        : 0,
+      completedLessons
+    },
+    progress: Array.from(progressByCourse.values()),
+    recommendedCourses
+  };
 };
 
 const listUsers = async ({ search, status, page, limit }) => {
@@ -26,6 +132,8 @@ const listUsers = async ({ search, status, page, limit }) => {
     name: user.name,
     email: user.email,
     phone: user.phone || '',
+    role: normalizeRole(user.role),
+    rank: formatRank(user),
     balance: parseFloat(user.balance || 0),
     status: user.status || 'active',
     refCode: user.ref_code || null,
@@ -72,8 +180,9 @@ const getUserById = async (id) => {
     id: String(user.id),
     name: user.name,
     email: user.email,
-    role: user.role || 'user',
+    role: normalizeRole(user.role),
     phone: user.phone || '',
+    rank: formatRank(user),
     balance: parseFloat(user.balance || 0),
     status: user.status || 'active',
     avatar: user.avatar_url || '',
@@ -90,15 +199,22 @@ const getUserById = async (id) => {
       workflows: orders.workflows || 0,
       vps: orders.vps || 0
     },
+    dashboard: await buildStudentDashboard(user),
     createdAt: user.created_at,
     updatedAt: user.updated_at
   };
 };
 
-const createUser = async ({ name, email, phone, password, status }) => {
+const createUser = async ({ name, email, phone, password, status, rankId, role = 'user' }) => {
   const existing = await userModel.getUserByEmail(email);
   if (existing) {
     throw ApiError.badRequest('Email already exists');
+  }
+
+  let finalRankId = rankId || null;
+  if (!finalRankId && !isPrivilegedRole(role)) {
+    const basicRank = await rankModel.getRankByCode('basic');
+    finalRankId = basicRank ? basicRank.id : null;
   }
 
   const passwordHash = await hashPassword(password);
@@ -107,7 +223,9 @@ const createUser = async ({ name, email, phone, password, status }) => {
     email,
     phone,
     passwordHash,
-    status: status || 'active'
+    status: status || 'active',
+    rankId: finalRankId,
+    role: role || 'user'
   });
 
   return formatUserResponse(user);
@@ -131,7 +249,8 @@ const updateUser = async (id, payload) => {
     email: payload.email,
     phone: payload.phone,
     status: payload.status,
-    balance: payload.balance
+    balance: payload.balance,
+    rankId: payload.rankId
   });
 
   return formatUserResponse(updated);
@@ -222,6 +341,21 @@ const getUserRefs = async (id, { page, limit }) => {
   return userModel.getUserRefs(parseInt(id), { page, limit });
 };
 
+const updateUserRank = async (id, rankId) => {
+  const user = await userModel.getUserById(parseInt(id));
+  if (!user) throw ApiError.notFound('User not found');
+
+  if (rankId) {
+    const rank = await rankModel.getRankById(parseInt(rankId));
+    if (!rank) {
+      throw ApiError.notFound('Rank not found');
+    }
+  }
+
+  const updated = await userModel.updateUser(parseInt(id), { rankId: rankId || null });
+  return formatUserResponse(updated);
+};
+
 const adminResetPassword = async (id, newPassword) => {
   const user = await userModel.getUserById(parseInt(id));
   if (!user) throw ApiError.notFound('User not found');
@@ -231,12 +365,23 @@ const adminResetPassword = async (id, newPassword) => {
   return true;
 };
 
+const getMyDashboard = async (userId) => {
+  const user = await userModel.getUserById(parseInt(userId));
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+
+  return buildStudentDashboard(user);
+};
+
 const formatUserResponse = (user) => {
   return {
     id: String(user.id),
     name: user.name,
     email: user.email,
     phone: user.phone || '',
+    role: normalizeRole(user.role),
+    rank: formatRank(user),
     balance: parseFloat(user.balance || 0),
     status: user.status || 'active',
     joinedAt: user.created_at,
@@ -290,9 +435,10 @@ module.exports = {
   getUserDetailStats,
   getUserOrders,
   getUserRefs,
+  updateUserRank,
   adminResetPassword,
   getUserByEmail,
   changePassword,
-  getUserByApiToken
+  getUserByApiToken,
+  getMyDashboard
 };
-

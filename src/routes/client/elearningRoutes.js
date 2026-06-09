@@ -1,6 +1,6 @@
 const express = require('express');
 const Joi = require('joi');
-const { authenticate } = require('../../middlewares/auth');
+const { authenticate, optionalAuth } = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
 const elearningController = require('../../controllers/client/elearningController');
 
@@ -9,6 +9,7 @@ const router = express.Router();
 // GET /api/client/elearning/courses - Lấy danh sách khoá học cho client
 router.get(
   '/courses',
+  optionalAuth,
   validate({
     query: Joi.object({
       category: Joi.string().optional(),
@@ -23,6 +24,7 @@ router.get(
 // GET /api/client/elearning/courses/:id - Lấy chi tiết khoá học cho client
 router.get(
   '/courses/:id',
+  optionalAuth,
   validate({
     params: Joi.object({
       id: Joi.string().required()
@@ -35,7 +37,7 @@ router.get(
 // Using optionalAuth to allow checking without login, but will return false if not logged in
 router.get(
   '/courses/:id/enrollment',
-  require('../../middlewares/auth').optionalAuth,
+  optionalAuth,
   validate({
     params: Joi.object({
       id: Joi.string().required()
@@ -56,6 +58,9 @@ router.post(
   elearningController.enrollCourse
 );
 
+router.get('/me/dashboard', authenticate, elearningController.getDashboard);
+router.get('/me/rank', authenticate, elearningController.getRankSummary);
+
 // GET /api/client/elearning/categories - Lấy danh sách danh mục khoá học
 router.get(
   '/categories',
@@ -63,7 +68,6 @@ router.get(
 );
 
 module.exports = router;
-
 
 
 

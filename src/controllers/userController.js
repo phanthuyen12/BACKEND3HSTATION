@@ -79,6 +79,12 @@ const adminResetPassword = asyncHandler(async (req, res) => {
   return successResponse(res, {}, 'Mật khẩu đã được cập nhật');
 });
 
+const updateUserRank = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const user = await userService.updateUserRank(id, req.body.rankId);
+  return successResponse(res, { data: user }, 'User rank updated');
+});
+
 module.exports = {
   listUsers,
   getUserById,
@@ -91,9 +97,9 @@ module.exports = {
   getUserDetailStats,
   getUserOrders,
   getUserRefs,
-  adminResetPassword
+  adminResetPassword,
+  updateUserRank
 };
-
 
 
 

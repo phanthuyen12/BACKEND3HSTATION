@@ -58,7 +58,9 @@ router.post(
       email: Joi.string().email().required(),
       phone: Joi.string().optional(),
       password: Joi.string().min(6).required(),
-      status: Joi.string().valid('active', 'locked').optional()
+      status: Joi.string().valid('active', 'locked').optional(),
+      rankId: Joi.number().integer().positive().optional(),
+      role: Joi.string().valid('user', 'admin', 'super_admin').optional()
     })
   }),
   userController.createUser
@@ -78,7 +80,8 @@ router.put(
       email: Joi.string().email().optional(),
       phone: Joi.string().optional(),
       status: Joi.string().valid('active', 'locked').optional(),
-      balance: Joi.number().min(0).optional()
+      balance: Joi.number().min(0).optional(),
+      rankId: Joi.number().integer().positive().allow(null).optional()
     })
   }),
   userController.updateUser
@@ -143,10 +146,22 @@ router.patch(
   userController.adminResetPassword
 );
 
+// PATCH /api/users/:id/rank - Gán rank cho user
+router.patch(
+  '/:id/rank',
+  authenticate,
+  authorizeRoles('admin'),
+  validate({
+    params: Joi.object({ id: Joi.string().required() }),
+    body: Joi.object({
+      rankId: Joi.number().integer().positive().allow(null).required()
+    })
+  }),
+  userController.updateUserRank
+);
+
 
 module.exports = router;
-
-
 
 
 

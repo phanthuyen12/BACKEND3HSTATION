@@ -3,6 +3,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { verifyToken } = require('../utils/jwt');
 const userService = require('../services/userService');
 const sessionService = require('../services/sessionService');
+const { isPrivilegedRole } = require('../utils/roles');
 
 const authenticate = asyncHandler(async (req, _res, next) => {
   const header = req.headers.authorization;
@@ -61,7 +62,7 @@ const authorizeRoles = (...roles) =>
       throw ApiError.unauthorized();
     }
 
-    if (!roles.includes(req.user.role)) {
+    if (!roles.includes(req.user.role) && !(roles.includes('admin') && isPrivilegedRole(req.user.role))) {
       throw ApiError.forbidden('Insufficient permissions');
     }
 
@@ -80,7 +81,7 @@ const authenticateByToken = asyncHandler(async (req, _res, next) => {
     throw ApiError.unauthorized('Invalid API token');
   }
 
-  if (user.role !== 'admin') {
+  if (!isPrivilegedRole(user.role)) {
     throw ApiError.forbidden('Admin access required');
   }
 

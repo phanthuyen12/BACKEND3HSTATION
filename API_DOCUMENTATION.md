@@ -6,7 +6,7 @@ Tài liệu này được biên soạn trực tiếp từ các router/controller
 
 ### 1.1 Base URL
 ```
-http://localhost:3000/api
+https://api.aetrading.vn/api
 ```
 
 ### 1.2 Authentication
@@ -871,7 +871,7 @@ http://localhost:3000/api
 7. **File upload**: route `/client/topups/:code/upload-proof` chưa có middleware (multer). Khi cần upload thật, bổ sung middleware xử lý multipart.
 8. **Testing nhanh**:
    ```bash
-   curl -H "Authorization: Bearer <token>" "http://localhost:3000/api/elearning/courses?page=1"
+   curl -H "Authorization: Bearer <token>" "https://api.aetrading.vn/api/elearning/courses?page=1"
    ```
    hoặc dùng Postman/Hoppscotch dựa theo tài liệu này.
 

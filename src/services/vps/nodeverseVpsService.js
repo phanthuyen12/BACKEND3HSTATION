@@ -832,6 +832,10 @@ const sendBulkActivationEmails = async () => {
 
 const processPendingEmailNotifications = async () => {
   try {
+    if (!env.nodeverse.apiKey) {
+      return { processed: 0, skipped: true, reason: 'NODEVERSE_API_KEY not configured' };
+    }
+
     const pending = await nodeverseModel.getPendingActivationEmails(20);
     if (!pending.length) return { processed: 0 };
 
@@ -849,8 +853,8 @@ const processPendingEmailNotifications = async () => {
     
     return { processed: pending.length, success: successCount };
   } catch (err) {
-    console.error(`[Auto-Email] Fatal error in processPendingEmailNotifications:`, err.message);
-    return { error: err.message };
+    console.error(`[Auto-Email] Fatal error in processPendingEmailNotifications:`, err?.stack || err?.message || err);
+    return { error: err?.message || String(err) };
   }
 };
 
@@ -876,5 +880,4 @@ module.exports = {
   sendBulkActivationEmails,
   processPendingEmailNotifications
 };
-
 

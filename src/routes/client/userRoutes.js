@@ -33,6 +33,7 @@ router.get(
   userController.getMyOrders
 );
 router.get('/me/my-courses', authenticate, userController.getMyCourses);
+router.get('/me/dashboard', authenticate, userController.getMyDashboard);
 router.post(
   '/change-password',
   authenticate,
@@ -46,7 +47,6 @@ router.post(
 );
 
 module.exports = router;
-
 
 
 

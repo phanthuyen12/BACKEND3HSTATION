@@ -3,24 +3,17 @@ const asyncHandler = require('../../utils/asyncHandler');
 const topupService = require('../../services/topups/topupService');
 const bankModel = require('../../models/bankModel');
 
-const createTopup = asyncHandler(async (req, res) => {
-  const userId = req.user?.id;
-  if (!userId) {
-    const ApiError = require('../../utils/apiError');
-    throw ApiError.unauthorized('User not authenticated');
-  }
+const disabledResponse = () => {
+  const ApiError = require('../../utils/apiError');
+  throw ApiError.forbidden('Nạp tiền đã bị vô hiệu hóa. Quyền học tập được cấp theo rank.');
+};
 
-  const data = await topupService.createTopup({
-    userId,
-    amount: req.body.amount,
-    bankId: req.body.bankId || req.body.bank_id
-  });
-  return successResponse(res, { data }, 'Topup created', 201);
+const createTopup = asyncHandler(async (req, res) => {
+  disabledResponse();
 });
 
 const uploadProof = asyncHandler(async (req, res) => {
-  const data = await topupService.uploadProof(req.params.code, req.body.paymentProof || req.body.payment_proof);
-  return successResponse(res, { data }, 'Proof uploaded');
+  disabledResponse();
 });
 
 const getHistory = asyncHandler(async (req, res) => {
@@ -70,7 +63,6 @@ const getTopupByCode = asyncHandler(async (req, res) => {
 });
 
 module.exports = { createTopup, uploadProof, getHistory, getBanks, getTopupByCode };
-
 
 
 

@@ -85,6 +85,69 @@ const getCourseByTitle = async (title) => {
   return rows[0] || null;
 };
 
+const listAccessibleCourses = async ({ user = null, categoryId, search, limit, offset }) => {
+  const clauses = ['c.status = ?'];
+  const params = ['active'];
+
+  if (categoryId) {
+    clauses.push('c.category_id = ?');
+    params.push(categoryId);
+  }
+
+  if (search) {
+    clauses.push('(c.title LIKE ? OR cat.name LIKE ?)');
+    params.push(`%${search}%`, `%${search}%`);
+  }
+
+  if (!user || user.role === 'user') {
+    clauses.push('c.is_free = 1');
+  } else if (user.role !== 'admin' && user.role !== 'super_admin') {
+    if (!user.rank_id) {
+      clauses.push('c.is_free = 1');
+    } else {
+      clauses.push('(c.is_free = 1 OR EXISTS (SELECT 1 FROM rank_courses rc INNER JOIN ranks r ON r.id = rc.rank_id WHERE rc.course_id = c.id AND rc.rank_id = ? AND rc.status = "active" AND r.status = "active"))');
+      params.push(user.rank_id);
+    }
+  }
+
+  const where = `WHERE ${clauses.join(' AND ')}`;
+  const limitInt = parseInt(limit, 10) || 20;
+  const offsetInt = parseInt(offset, 10) || 0;
+  const sql = `${baseSelect} ${where} ORDER BY c.created_at DESC LIMIT ? OFFSET ?`;
+  params.push(limitInt, offsetInt);
+  return query(sql, params);
+};
+
+const countAccessibleCourses = async ({ user = null, categoryId, search }) => {
+  const clauses = ['c.status = ?'];
+  const params = ['active'];
+
+  if (categoryId) {
+    clauses.push('c.category_id = ?');
+    params.push(categoryId);
+  }
+
+  if (search) {
+    clauses.push('(c.title LIKE ? OR cat.name LIKE ?)');
+    params.push(`%${search}%`, `%${search}%`);
+  }
+
+  if (!user || user.role === 'user') {
+    clauses.push('c.is_free = 1');
+  } else if (user.role !== 'admin' && user.role !== 'super_admin') {
+    if (!user.rank_id) {
+      clauses.push('c.is_free = 1');
+    } else {
+      clauses.push('(c.is_free = 1 OR EXISTS (SELECT 1 FROM rank_courses rc INNER JOIN ranks r ON r.id = rc.rank_id WHERE rc.course_id = c.id AND rc.rank_id = ? AND rc.status = "active" AND r.status = "active"))');
+      params.push(user.rank_id);
+    }
+  }
+
+  const where = `WHERE ${clauses.join(' AND ')}`;
+  const rows = await query(`SELECT COUNT(*) as total FROM courses c LEFT JOIN categories cat ON c.category_id = cat.id ${where}`, params);
+  return rows[0]?.total || 0;
+};
+
 const createCourse = async ({
   title,
   shortDescription,
@@ -171,9 +234,10 @@ module.exports = {
   countCourses,
   getCourseById,
   getCourseByTitle,
+  listAccessibleCourses,
+  countAccessibleCourses,
   createCourse,
   updateCourse,
   deleteCourse,
   getCourseSections
 };
-

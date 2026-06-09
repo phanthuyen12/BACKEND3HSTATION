@@ -1,4 +1,5 @@
 const nodeverseVpsService = require('../services/vps/nodeverseVpsService');
+const env = require('../config/env');
 
 /**
  * Task tự động sync danh sách VPS devices từ Nodeverse API
@@ -8,6 +9,11 @@ const startNodeverseSyncTask = () => {
     const FIVE_HOURS = 5 * 60 * 60 * 1000;
     
     console.log('[Task] Khởi tạo Nodeverse Sync Task (Chu kỳ: 5 tiếng)');
+
+    if (!env.nodeverse.apiKey) {
+        console.warn('[Task] Bỏ qua Nodeverse Sync/Auto-Email vì NODEVERSE_API_KEY chưa được cấu hình');
+        return;
+    }
     
     // Chạy lần đầu sau khi start 30 giây (tránh làm chậm startup boot)
     setTimeout(async () => {
@@ -16,7 +22,7 @@ const startNodeverseSyncTask = () => {
             const result = await nodeverseVpsService.syncDevicesFromNodeverse();
             console.log(`[Task] Nodeverse Sync thành công: ${result.synced} devices.`);
         } catch (err) {
-            console.error('[Task] Nodeverse Sync thất bại:', err.message);
+            console.error('[Task] Nodeverse Sync thất bại:', err?.message || err);
         }
     }, 30000);
 
@@ -27,7 +33,7 @@ const startNodeverseSyncTask = () => {
             const result = await nodeverseVpsService.syncDevicesFromNodeverse();
             console.log(`[Task] Nodeverse Sync thành công: ${result.synced} devices.`);
         } catch (err) {
-            console.error('[Task] Nodeverse Sync thất bại:', err.message);
+            console.error('[Task] Nodeverse Sync thất bại:', err?.message || err);
         }
     }, FIVE_HOURS);
 
@@ -41,7 +47,7 @@ const startNodeverseSyncTask = () => {
                 console.log(`[Task] Auto-Activation-Email thành công: ${result.success}/${result.processed}`);
             }
         } catch (err) {
-            console.error('[Task] Auto-Activation-Email thất bại:', err.message);
+            console.error('[Task] Auto-Activation-Email thất bại:', err?.message || err);
         }
     }, ONE_MINUTE);
 };

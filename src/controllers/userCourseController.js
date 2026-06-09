@@ -2,10 +2,11 @@ const ApiError = require('../utils/apiError');
 const userCourseService = require('../services/userCourseService');
 const { successResponse } = require('../utils/response');
 const asyncHandler = require('../utils/asyncHandler');
+const { isPrivilegedRole } = require('../utils/roles');
 
 const ensureOwnerOrAdmin = (req) => {
   const targetUserId = Number(req.params.id);
-  if (req.user.role !== 'admin' && req.user.id !== targetUserId) {
+  if (!isPrivilegedRole(req.user.role) && req.user.id !== targetUserId) {
     throw ApiError.forbidden('Not allowed');
   }
 };
@@ -17,7 +18,7 @@ const listUserCourses = asyncHandler(async (req, res) => {
 });
 
 const grantCourse = asyncHandler(async (req, res) => {
-  if (req.user.role !== 'admin') {
+  if (!isPrivilegedRole(req.user.role)) {
     throw ApiError.forbidden('Admin permission required');
   }
 
@@ -26,7 +27,7 @@ const grantCourse = asyncHandler(async (req, res) => {
 });
 
 const revokeCourse = asyncHandler(async (req, res) => {
-  if (req.user.role !== 'admin') {
+  if (!isPrivilegedRole(req.user.role)) {
     throw ApiError.forbidden('Admin permission required');
   }
 
@@ -39,7 +40,6 @@ module.exports = {
   grantCourse,
   revokeCourse
 };
-
 
 
 
