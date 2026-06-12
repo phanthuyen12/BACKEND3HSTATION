@@ -7,6 +7,7 @@ const baseSelect = `
     c.short_description,
     c.description,
     c.category_id,
+    c.is_free,
     c.price,
     c.thumbnail_url,
     c.level,
@@ -99,7 +100,7 @@ const listAccessibleCourses = async ({ user = null, categoryId, search, limit, o
     params.push(`%${search}%`, `%${search}%`);
   }
 
-  if (!user || user.role === 'user') {
+  if (!user) {
     clauses.push('c.is_free = 1');
   } else if (user.role !== 'admin' && user.role !== 'super_admin') {
     if (!user.rank_id) {
@@ -132,7 +133,7 @@ const countAccessibleCourses = async ({ user = null, categoryId, search }) => {
     params.push(`%${search}%`, `%${search}%`);
   }
 
-  if (!user || user.role === 'user') {
+  if (!user) {
     clauses.push('c.is_free = 1');
   } else if (user.role !== 'admin' && user.role !== 'super_admin') {
     if (!user.rank_id) {
