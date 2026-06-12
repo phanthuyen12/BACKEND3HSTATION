@@ -10,6 +10,22 @@ const courseLessonModel = require('../../models/courseLessonModel');
 const courseProgressModel = require('../../models/courseProgressModel');
 const { buildPagination } = require('../../utils/pagination');
 
+const getUserRankId = (user) => {
+  if (!user) return null;
+
+  if (user.rank_id !== undefined && user.rank_id !== null) {
+    const rankId = parseInt(user.rank_id, 10);
+    return Number.isNaN(rankId) ? null : rankId;
+  }
+
+  if (user.rank?.id) {
+    const rankId = parseInt(user.rank.id, 10);
+    return Number.isNaN(rankId) ? null : rankId;
+  }
+
+  return null;
+};
+
 const resolveCourseAccess = async (course, user) => {
   if (!course || course.status !== 'active') {
     return false;
@@ -27,12 +43,13 @@ const resolveCourseAccess = async (course, user) => {
     return true;
   }
 
-  if (!user.rank_id) {
+  const rankId = getUserRankId(user);
+  if (!rankId) {
     return false;
   }
 
   return rankCourseModel.isCourseAllowedForRank({
-    rankId: user.rank_id,
+    rankId,
     courseId: course.id
   });
 };
@@ -42,11 +59,12 @@ const getUserRankIds = async (user) => {
     return [];
   }
 
-  if (!user.rank_id) {
+  const rankId = getUserRankId(user);
+  if (!rankId) {
     return [];
   }
 
-  return [user.rank_id];
+  return [rankId];
 };
 
 const canAccessCourse = async ({ course, user }) => {
@@ -55,9 +73,10 @@ const canAccessCourse = async ({ course, user }) => {
   if (course.is_free) return true;
   if (!user) return false;
   if (user.role === 'admin' || user.role === 'super_admin') return true;
-  if (!user.rank_id) return false;
+  const rankId = getUserRankId(user);
+  if (!rankId) return false;
   return rankCourseModel.isCourseAllowedForRank({
-    rankId: user.rank_id,
+    rankId,
     courseId: course.id
   });
 };
@@ -80,9 +99,12 @@ const listCourses = async ({ page, limit, search, category, user = null }) => {
   let allowedCourseIds = new Set();
   if (user?.role === 'admin' || user?.role === 'super_admin') {
     allowedCourseIds = new Set(items.map((course) => Number(course.id)));
-  } else if (user?.rank_id) {
-    const rankCourseIds = await rankCourseModel.getAllowedCourseIdsByRankIds([user.rank_id]);
-    allowedCourseIds = new Set(rankCourseIds);
+  } else {
+    const rankId = getUserRankId(user);
+    if (rankId) {
+      const rankCourseIds = await rankCourseModel.getAllowedCourseIdsByRankIds([rankId]);
+      allowedCourseIds = new Set(rankCourseIds);
+    }
   }
 
   const formattedItems = items.map((course) => ({

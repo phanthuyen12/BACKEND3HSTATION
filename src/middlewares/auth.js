@@ -5,6 +5,20 @@ const userService = require('../services/userService');
 const sessionService = require('../services/sessionService');
 const { isPrivilegedRole } = require('../utils/roles');
 
+const attachLegacyRankId = (user) => {
+  if (!user) return user;
+
+  if (user.rank_id !== undefined) {
+    return user;
+  }
+
+  const rankId = user.rank?.id ? parseInt(user.rank.id, 10) : null;
+  return {
+    ...user,
+    rank_id: Number.isNaN(rankId) ? null : rankId
+  };
+};
+
 const authenticate = asyncHandler(async (req, _res, next) => {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
@@ -24,7 +38,7 @@ const authenticate = asyncHandler(async (req, _res, next) => {
     throw ApiError.unauthorized('Session expired because the account signed in on another device');
   }
 
-  const user = await userService.getUserById(decoded.userId);
+  const user = attachLegacyRankId(await userService.getUserById(decoded.userId));
 
   if (!user) {
     throw ApiError.unauthorized('User not found');
@@ -44,7 +58,7 @@ const optionalAuth = asyncHandler(async (req, _res, next) => {
       if (!sessionService.isSessionActive(decoded.userId, decoded.sessionId)) {
         return next();
       }
-      const user = await userService.getUserById(decoded.userId);
+      const user = attachLegacyRankId(await userService.getUserById(decoded.userId));
       if (user) {
         req.user = user;
         req.sessionId = decoded.sessionId;
