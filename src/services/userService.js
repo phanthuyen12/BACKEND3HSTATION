@@ -16,8 +16,11 @@ const generateApiToken = () => {
 
 const formatRank = (rank) => {
   if (!rank) return null;
+  const rankId = rank.rank_id !== undefined ? rank.rank_id : rank.id;
+  if (!rankId) return null;
+
   return {
-    id: String(rank.id),
+    id: String(rankId),
     code: rank.rank_code || rank.code || null,
     name: rank.rank_name || rank.name || null,
     description: rank.rank_description || rank.description || null,
