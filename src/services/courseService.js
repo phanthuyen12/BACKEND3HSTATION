@@ -50,10 +50,9 @@ const canViewPaidCourse = async (course, user) => {
   if (!user) return false;
   if (isPrivilegedRole(user.role)) return true;
   if (!user.rank_id) return false;
-  return rankCourseModel.isCourseAllowedForRank({
-    rankId: user.rank_id,
-    courseId: course.id
-  });
+  
+  // Cho phép tất cả user có rank được học khóa học (bypass phân quyền Admin)
+  return true;
 };
 
 const getCourseDetail = async ({ courseId, user }) => {

@@ -48,10 +48,8 @@ const resolveCourseAccess = async (course, user) => {
     return false;
   }
 
-  return rankCourseModel.isCourseAllowedForRank({
-    rankId,
-    courseId: course.id
-  });
+  // Cho phép tất cả user có rank được học khóa học (bypass phân quyền Admin)
+  return true;
 };
 
 const getUserRankIds = async (user) => {
@@ -75,10 +73,9 @@ const canAccessCourse = async ({ course, user }) => {
   if (user.role === 'admin' || user.role === 'super_admin') return true;
   const rankId = getUserRankId(user);
   if (!rankId) return false;
-  return rankCourseModel.isCourseAllowedForRank({
-    rankId,
-    courseId: course.id
-  });
+  
+  // Cho phép tất cả user có rank được học khóa học
+  return true;
 };
 
 const listCourses = async ({ page, limit, search, category, user = null }) => {
@@ -102,8 +99,8 @@ const listCourses = async ({ page, limit, search, category, user = null }) => {
   } else {
     const rankId = getUserRankId(user);
     if (rankId) {
-      const rankCourseIds = await rankCourseModel.getAllowedCourseIdsByRankIds([rankId]);
-      allowedCourseIds = new Set(rankCourseIds);
+      // Bypass phân quyền, cho phép tất cả các khoá học đối với người dùng có rank
+      allowedCourseIds = new Set(items.map((course) => Number(course.id)));
     }
   }
 
