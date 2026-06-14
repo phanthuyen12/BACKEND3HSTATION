@@ -78,6 +78,25 @@ const listCourseVideos = async (courseId, user, { sectionId = null, categoryId =
   return videos;
 };
 
+const getCourseVideoPlaybackSource = async (courseId, videoId, user) => {
+  const { canViewFull } = await canAccessCourseVideos(courseId, user);
+  const video = await videoModel.getVideoById(videoId);
+
+  if (!video) {
+    throw ApiError.notFound('Video not found');
+  }
+
+  if (video.course_id !== parseInt(courseId, 10)) {
+    throw ApiError.badRequest('Video does not belong to this course');
+  }
+
+  if (!canViewFull && !video.preview) {
+    throw ApiError.forbidden('You do not have access to this video');
+  }
+
+  return video;
+};
+
 const createVideo = async (courseId, payload) => {
   const course = await courseModel.getCourseById(courseId);
   if (!course) {
@@ -161,6 +180,7 @@ const deleteVideo = async (id) => {
 
 module.exports = {
   listCourseVideos,
+  getCourseVideoPlaybackSource,
   createVideo,
   updateVideo,
   deleteVideo

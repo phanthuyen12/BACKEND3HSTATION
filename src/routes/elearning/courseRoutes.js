@@ -125,6 +125,22 @@ router.get(
   videoController.listCourseVideos
 );
 
+// GET /api/elearning/courses/:course_id/videos/:id/stream - Proxy protected HLS/video source
+router.get(
+  '/:course_id/videos/:id/stream',
+  optionalAuth,
+  validate({
+    params: Joi.object({
+      course_id: Joi.number().integer().positive().required(),
+      id: Joi.number().integer().positive().required()
+    }),
+    query: Joi.object({
+      token: Joi.string().optional()
+    })
+  }),
+  videoController.streamCourseVideo
+);
+
 // POST /api/elearning/courses/:course_id/videos - Tạo video mới cho section
 router.post(
   '/:course_id/videos',
@@ -182,7 +198,6 @@ router.delete(
 );
 
 module.exports = router;
-
 
 
 
