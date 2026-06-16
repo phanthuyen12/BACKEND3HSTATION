@@ -21,6 +21,8 @@ router.put(
     body: Joi.object({
       title: Joi.string().optional(),
       url: Joi.string().uri().optional(),
+      img_banner: Joi.string().allow('', null).optional(),
+      imgBanner: Joi.string().allow('', null).optional(),
       duration: Joi.number().integer().min(0).optional(),
       order: Joi.number().integer().min(0).optional(),
       preview: Joi.boolean().optional()
@@ -38,7 +40,6 @@ router.delete(
 );
 
 module.exports = router;
-
 
 
 

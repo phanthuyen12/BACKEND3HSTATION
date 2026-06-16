@@ -103,6 +103,7 @@ const createVideo = async (courseId, payload) => {
     sectionId: parseInt(payload.sectionId, 10),
     title: payload.title,
     url: payload.url,
+    imgBanner: payload.imgBanner ?? payload.img_banner ?? null,
     duration: parseInt(payload.duration, 10),
     order: parseInt(payload.order, 10),
     preview: payload.preview ? 1 : 0
@@ -143,6 +144,7 @@ const updateVideo = async (id, payload) => {
     sectionId: payload.sectionId,
     title: payload.title,
     url: payload.url,
+    imgBanner: payload.imgBanner ?? payload.img_banner,
     duration: payload.duration,
     order: payload.order,
     preview: payload.preview

@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS videos (
   course_id INT NOT NULL,
   title VARCHAR(255) NOT NULL,
   url VARCHAR(500) NOT NULL,
+  img_banner VARCHAR(500) NULL,
   duration VARCHAR(50) NULL,
   `order` INT DEFAULT 0,
   preview TINYINT(1) DEFAULT 0,
@@ -136,7 +137,6 @@ CREATE TABLE IF NOT EXISTS user_course (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
-
 
 
 

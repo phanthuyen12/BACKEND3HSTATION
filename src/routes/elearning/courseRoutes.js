@@ -136,6 +136,8 @@ router.post(
       sectionId: Joi.number().integer().positive().required(),
       title: Joi.string().required(),
       url: Joi.string().uri().required(), // optional: validate URL
+      img_banner: Joi.string().allow('', null).optional(),
+      imgBanner: Joi.string().allow('', null).optional(),
       duration: Joi.number().integer().min(0).required(),
       order: Joi.number().integer().min(0).required(),
       preview: Joi.boolean().required()
@@ -159,6 +161,8 @@ router.put(
       sectionId: Joi.number().integer().positive().optional(),
       title: Joi.string().optional(),
       url: Joi.string().optional(),
+      img_banner: Joi.string().allow('', null).optional(),
+      imgBanner: Joi.string().allow('', null).optional(),
       duration: Joi.number().integer().min(0).optional(),
       order: Joi.number().integer().min(0).optional(),
       preview: Joi.boolean().optional()
@@ -182,7 +186,6 @@ router.delete(
 );
 
 module.exports = router;
-
 
 
 

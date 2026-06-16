@@ -8,6 +8,7 @@ const getVideosByCourseId = async (courseId, { onlyPreview = false, sectionId = 
       v.section_id, 
       v.title, 
       v.url, 
+      v.img_banner,
       v.duration, 
       v.\`order\`, 
       v.preview, 
@@ -64,7 +65,7 @@ const getVideosBySectionId = async (sectionId, { onlyPreview = false } = {}) => 
   }
 
   const sql = `
-    SELECT id, course_id, section_id, title, url, duration, \`order\`, preview, created_at, updated_at
+    SELECT id, course_id, section_id, title, url, img_banner, duration, \`order\`, preview, created_at, updated_at
     FROM videos
     WHERE ${clauses.join(' AND ')}
     ORDER BY \`order\` ASC
@@ -74,22 +75,23 @@ const getVideosBySectionId = async (sectionId, { onlyPreview = false } = {}) => 
 
 const getVideoById = async (id) => {
   const rows = await query(
-    'SELECT id, course_id, section_id, title, url, duration, `order`, preview, created_at, updated_at FROM videos WHERE id = ?',
+    'SELECT id, course_id, section_id, title, url, img_banner, duration, `order`, preview, created_at, updated_at FROM videos WHERE id = ?',
     [id]
   );
   return rows[0] || null;
 };
 
-const createVideo = async ({ courseId, sectionId, title, url, duration, order, preview }) => {
+const createVideo = async ({ courseId, sectionId, title, url, imgBanner, duration, order, preview }) => {
   const sql = `
-    INSERT INTO videos (course_id, section_id, title, url, duration, \`order\`, preview)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO videos (course_id, section_id, title, url, img_banner, duration, \`order\`, preview)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const params = [
     parseInt(courseId, 10),
     parseInt(sectionId, 10),
     title,
     url,
+    imgBanner || null,
     parseInt(duration, 10),
     parseInt(order, 10),
     preview ? 1 : 0
@@ -116,6 +118,7 @@ const updateVideo = async (id, data) => {
     section_id: data.sectionId,
     title: data.title,
     url: data.url,
+    img_banner: data.imgBanner,
     duration: data.duration,
     '`order`': data.order,
     preview: data.preview
@@ -150,7 +153,6 @@ module.exports = {
   updateVideo,
   deleteVideo
 };
-
 
 
 
