@@ -23,7 +23,9 @@ router.put(
       url: Joi.string().uri().optional(),
       duration: Joi.number().integer().min(0).optional(),
       order: Joi.number().integer().min(0).optional(),
-      preview: Joi.boolean().optional()
+      preview: Joi.boolean().optional(),
+      bannerUrl: Joi.string().uri().allow('', null).optional(),
+      banner_url: Joi.string().uri().allow('', null).optional()
     })
   }),
   videoController.updateVideo
@@ -38,7 +40,6 @@ router.delete(
 );
 
 module.exports = router;
-
 
 
 

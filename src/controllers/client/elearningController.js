@@ -23,6 +23,13 @@ const listCategories = asyncHandler(async (_req, res) => {
   return successResponse(res, { data, total: data.length });
 });
 
+const listFeaturedVideoBanners = asyncHandler(async (req, res) => {
+  const data = await elearningService.listFeaturedVideoBanners({
+    limit: req.query.limit
+  });
+  return successResponse(res, { data, total: data.length });
+});
+
 const enrollCourse = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const courseId = req.params.id;
@@ -56,12 +63,12 @@ module.exports = {
   listCourses,
   getCourseById,
   listCategories,
+  listFeaturedVideoBanners,
   enrollCourse,
   checkEnrollment,
   getDashboard,
   getRankSummary
 };
-
 
 
 

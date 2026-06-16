@@ -154,7 +154,9 @@ router.post(
       url: Joi.string().uri().required(), // optional: validate URL
       duration: Joi.number().integer().min(0).required(),
       order: Joi.number().integer().min(0).required(),
-      preview: Joi.boolean().required()
+      preview: Joi.boolean().required(),
+      bannerUrl: Joi.string().uri().allow('', null).optional(),
+      banner_url: Joi.string().uri().allow('', null).optional()
     })
   }),
   videoController.createVideo
@@ -177,7 +179,9 @@ router.put(
       url: Joi.string().optional(),
       duration: Joi.number().integer().min(0).optional(),
       order: Joi.number().integer().min(0).optional(),
-      preview: Joi.boolean().optional()
+      preview: Joi.boolean().optional(),
+      bannerUrl: Joi.string().uri().allow('', null).optional(),
+      banner_url: Joi.string().uri().allow('', null).optional()
     })
   }),
   videoController.updateVideo
@@ -198,7 +202,6 @@ router.delete(
 );
 
 module.exports = router;
-
 
 
 

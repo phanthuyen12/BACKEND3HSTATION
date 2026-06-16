@@ -67,4 +67,4 @@ Script này sẽ tự động:
 ### Bảng được cập nhật:
 - `users` - Thêm: phone, balance, status, address, last_login_at
 - `courses` - Thêm: short_description, level, students, rating, duration, lessons, status, content
-
+- `videos` - Thêm: `section_id`, `banner_url`

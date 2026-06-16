@@ -8,6 +8,7 @@ const userModel = require('../../models/userModel');
 const courseSectionModel = require('../../models/courseSectionModel');
 const courseLessonModel = require('../../models/courseLessonModel');
 const courseProgressModel = require('../../models/courseProgressModel');
+const videoModel = require('../../models/videoModel');
 const { buildPagination } = require('../../utils/pagination');
 
 const getUserRankId = (user) => {
@@ -256,6 +257,25 @@ const listCategories = async () => {
   return categoriesWithCourseCounts;
 };
 
+const listFeaturedVideoBanners = async ({ limit }) => {
+  const items = await videoModel.listFeaturedVideoBanners({ limit });
+
+  return items.map((video) => ({
+    id: String(video.id),
+    courseId: String(video.course_id),
+    sectionId: video.section_id || null,
+    title: video.title,
+    duration: video.duration || '',
+    order: video.order || 0,
+    preview: Boolean(video.preview),
+    bannerUrl: video.banner_url || '',
+    courseTitle: video.course_title || '',
+    courseThumbnail: video.course_thumbnail_url || '',
+    categoryId: video.category_id ? String(video.category_id) : null,
+    categoryName: video.category_name || ''
+  }));
+};
+
 const getRankSummaryForUser = async (userId) => {
   const user = await userModel.getUserById(parseInt(userId, 10));
   if (!user) {
@@ -346,6 +366,7 @@ module.exports = {
   listCourses,
   getCourseById,
   listCategories,
+  listFeaturedVideoBanners,
   enrollCourse,
   checkEnrollment,
   getRankSummaryForUser,

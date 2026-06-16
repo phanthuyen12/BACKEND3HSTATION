@@ -124,7 +124,8 @@ const createVideo = async (courseId, payload) => {
     url: payload.url,
     duration: parseInt(payload.duration, 10),
     order: parseInt(payload.order, 10),
-    preview: payload.preview ? 1 : 0
+    preview: payload.preview ? 1 : 0,
+    bannerUrl: payload.bannerUrl || payload.banner_url || null
   };
 
   console.log('createVideo service - videoData:', videoData);
@@ -164,7 +165,8 @@ const updateVideo = async (id, payload) => {
     url: payload.url,
     duration: payload.duration,
     order: payload.order,
-    preview: payload.preview
+    preview: payload.preview,
+    bannerUrl: payload.bannerUrl !== undefined ? payload.bannerUrl : payload.banner_url
   };
 
   return videoModel.updateVideo(id, updateData);

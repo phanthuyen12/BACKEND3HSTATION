@@ -67,8 +67,17 @@ router.get(
   elearningController.listCategories
 );
 
-module.exports = router;
+router.get(
+  '/video-banners',
+  validate({
+    query: Joi.object({
+      limit: Joi.number().integer().min(1).max(24).optional()
+    })
+  }),
+  elearningController.listFeaturedVideoBanners
+);
 
+module.exports = router;
 
 
 
