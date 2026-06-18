@@ -257,6 +257,15 @@ const getUserStats = async () => {
   };
 };
 
+const countDirectRefs = async (userId) => {
+  const [row] = await query(
+    'SELECT COUNT(*) as total FROM users WHERE ref_by = ?',
+    [userId]
+  );
+
+  return Number(row?.total || 0);
+};
+
 const getUserByRefCode = async (refCode) => {
   if (!refCode) return null;
   // Tìm kiếm case-insensitive và trim whitespace
@@ -299,6 +308,18 @@ const incrementRefCountAndCommission = async (userId, commissionAmount) => {
   return getUserById(userId);
 };
 
+const incrementRefCommission = async (userId, commissionAmount) => {
+  const sql = `
+    UPDATE users
+    SET
+      ref_commission = IFNULL(ref_commission, 0) + ?,
+      balance = IFNULL(balance, 0) + ?
+    WHERE id = ?
+  `;
+  await execute(sql, [commissionAmount, commissionAmount, userId]);
+  return getUserById(userId);
+};
+
 const getUserByApiToken = async (apiToken) => {
   const rows = await query(
     `${userSelectWithRank} WHERE u.api_token = ? LIMIT 1`,
@@ -329,9 +350,11 @@ module.exports = {
   getUserOrdersPaginated,
   getUserRefs,
   getUserStats,
+  countDirectRefs,
   getUserByRefCode,
   incrementRefCount,
   incrementRefCountAndCommission,
+  incrementRefCommission,
   getUserByApiToken,
   getUserByResetToken
 };

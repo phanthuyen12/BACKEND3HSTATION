@@ -13,8 +13,9 @@ const getMe = asyncHandler(async (req, res) => {
   return successResponse(res, { data: userData });
 });
 
-const updateMe = asyncHandler(async (_req, res) => {
-  return successResponse(res, { data: {} }, 'Profile updated');
+const updateMe = asyncHandler(async (req, res) => {
+  const data = await userService.updateMyProfile(req.user.id, req.body);
+  return successResponse(res, { data }, 'Profile updated');
 });
 
 const getMyOrders = asyncHandler(async (req, res) => {
@@ -69,8 +70,13 @@ const getMyDashboard = asyncHandler(async (req, res) => {
   return successResponse(res, { data });
 });
 
-module.exports = { getMe, updateMe, getMyOrders, getMyCourses, changePassword, getMyDashboard };
+const getMyReferrals = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 20 } = req.query;
+  const data = await userService.getMyReferrals(req.user.id, { page, limit });
+  return successResponse(res, { data });
+});
 
+module.exports = { getMe, updateMe, getMyOrders, getMyCourses, changePassword, getMyDashboard, getMyReferrals };
 
 
 

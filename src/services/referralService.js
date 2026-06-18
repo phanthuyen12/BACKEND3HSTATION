@@ -18,9 +18,8 @@ const applyReferralCommission = async ({ buyerId, orderAmount }) => {
   const commission = Number(orderAmount) * commissionRate;
   if (commission <= 0) return;
 
-  await userModel.incrementRefCountAndCommission(buyer.ref_by, commission);
+  await userModel.incrementRefCommission(buyer.ref_by, commission);
 };
 
 module.exports = { applyReferralCommission };
-
 

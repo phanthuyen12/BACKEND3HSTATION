@@ -14,6 +14,11 @@ const generateApiToken = () => {
   return crypto.randomBytes(32).toString('hex');
 };
 
+const generateRefCode = (userId) => {
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `REF${userId}${random}`;
+};
+
 const formatRank = (rank) => {
   if (!rank) return null;
   return {
@@ -142,6 +147,15 @@ const ensureBasicRankId = async () => {
   return basicRank ? basicRank.id : null;
 };
 
+const ensureUserRefCode = async (user) => {
+  if (!user) return null;
+  if (user.ref_code) return user;
+
+  return userModel.updateUser(parseInt(user.id, 10), {
+    refCode: generateRefCode(user.id)
+  });
+};
+
 const listUsers = async ({ search, status, page, limit }) => {
   const { limit: take, offset, page: currentPage } = buildPagination(page, limit);
 
@@ -190,18 +204,11 @@ const getUserById = async (id) => {
     throw ApiError.notFound('User not found');
   }
 
-  // Nếu user chưa có ref_code, tạo mới
-  if (!user.ref_code) {
-    const generateRefCode = (userId) => {
-      const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-      return `REF${userId}${random}`;
-    };
-    const refCode = generateRefCode(user.id);
-    user = await userModel.updateUser(parseInt(id), { refCode });
-  }
+  user = await ensureUserRefCode(user);
 
   // Get user orders stats
   const orders = await userModel.getUserOrdersStats(parseInt(id));
+  const directRefCount = await userModel.countDirectRefs(parseInt(id));
 
   return {
     id: String(user.id),
@@ -216,7 +223,7 @@ const getUserById = async (id) => {
     address: user.address || '',
     refCode: user.ref_code || null,
     refBy: user.ref_by || null,
-    refCount: user.ref_count || 0,
+    refCount: directRefCount,
     refCommission: parseFloat(user.ref_commission || 0),
     joinedAt: user.created_at,
     lastLoginAt: user.last_login_at || null,
@@ -367,6 +374,51 @@ const getUserRefs = async (id, { page, limit }) => {
   return userModel.getUserRefs(parseInt(id), { page, limit });
 };
 
+const getMyReferrals = async (userId, { page, limit }) => {
+  let user = await userModel.getUserById(parseInt(userId));
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+
+  user = await ensureUserRefCode(user);
+
+  const referralData = await userModel.getUserRefs(parseInt(userId), { page, limit });
+  const directRefCount = await userModel.countDirectRefs(parseInt(userId));
+
+  return {
+    refCode: user.ref_code || null,
+    refCount: directRefCount,
+    refCommission: Number(referralData.totalCommission || user.ref_commission || 0),
+    registerPath: user.ref_code ? `/landing-register?ref=${encodeURIComponent(user.ref_code)}` : null,
+    referrals: (referralData.data || []).map((refUser) => ({
+      id: String(refUser.id),
+      name: refUser.name,
+      email: refUser.email,
+      phone: refUser.phone || '',
+      balance: Number(refUser.balance || 0),
+      status: refUser.status || 'active',
+      createdAt: refUser.created_at
+    })),
+    pagination: referralData.pagination
+  };
+};
+
+const updateMyProfile = async (userId, payload) => {
+  const user = await userModel.getUserById(parseInt(userId));
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+
+  await userModel.updateUser(parseInt(userId), {
+    name: payload.name !== undefined ? String(payload.name).trim() : undefined,
+    phone: payload.phone !== undefined ? String(payload.phone).trim() : undefined,
+    address: payload.address !== undefined ? String(payload.address).trim() : undefined,
+    avatarUrl: payload.avatar !== undefined ? payload.avatar : undefined
+  });
+
+  return getUserById(userId);
+};
+
 const updateUserRank = async (id, rankId) => {
   const user = await userModel.getUserById(parseInt(id));
   if (!user) throw ApiError.notFound('User not found');
@@ -461,10 +513,12 @@ module.exports = {
   getUserDetailStats,
   getUserOrders,
   getUserRefs,
+  getMyReferrals,
   updateUserRank,
   adminResetPassword,
   getUserByEmail,
   changePassword,
   getUserByApiToken,
-  getMyDashboard
+  getMyDashboard,
+  updateMyProfile
 };

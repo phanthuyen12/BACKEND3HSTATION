@@ -34,6 +34,17 @@ router.get(
 );
 router.get('/me/my-courses', authenticate, userController.getMyCourses);
 router.get('/me/dashboard', authenticate, userController.getMyDashboard);
+router.get(
+  '/me/referrals',
+  authenticate,
+  validate({
+    query: Joi.object({
+      page: Joi.number().integer().min(1).optional(),
+      limit: Joi.number().integer().min(1).max(100).optional()
+    })
+  }),
+  userController.getMyReferrals
+);
 router.post(
   '/change-password',
   authenticate,
@@ -47,7 +58,6 @@ router.post(
 );
 
 module.exports = router;
-
 
 
 
