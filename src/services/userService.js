@@ -25,6 +25,18 @@ const formatRank = (rank) => {
   };
 };
 
+// Tạo rank object đúng từ user raw (sau khi JOIN ranks)
+const formatRankFromUser = (user) => {
+  if (!user || !user.rank_id) return null;
+  return formatRank({
+    id: user.rank_id,
+    rank_code: user.rank_code,
+    rank_name: user.rank_name,
+    rank_description: user.rank_description,
+    rank_status: user.rank_status
+  });
+};
+
 const getAllowedCoursesForRank = async (rankId) => {
   if (!rankId) return [];
   const allowedCourseIds = await rankCourseModel.getAllowedCourseIdsByRankIds([rankId]);
@@ -133,7 +145,7 @@ const listUsers = async ({ search, status, page, limit }) => {
     email: user.email,
     phone: user.phone || '',
     role: normalizeRole(user.role),
-    rank: formatRank(user),
+    rank: formatRankFromUser(user),
     balance: parseFloat(user.balance || 0),
     status: user.status || 'active',
     refCode: user.ref_code || null,
@@ -182,7 +194,7 @@ const getUserById = async (id) => {
     email: user.email,
     role: normalizeRole(user.role),
     phone: user.phone || '',
-    rank: formatRank(user),
+    rank: formatRankFromUser(user),
     balance: parseFloat(user.balance || 0),
     status: user.status || 'active',
     avatar: user.avatar_url || '',
@@ -381,7 +393,7 @@ const formatUserResponse = (user) => {
     email: user.email,
     phone: user.phone || '',
     role: normalizeRole(user.role),
-    rank: formatRank(user),
+    rank: formatRankFromUser(user),
     balance: parseFloat(user.balance || 0),
     status: user.status || 'active',
     joinedAt: user.created_at,
