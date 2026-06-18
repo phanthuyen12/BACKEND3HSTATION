@@ -127,6 +127,21 @@ const buildStudentDashboard = async (user) => {
   };
 };
 
+const ensureBasicRankId = async () => {
+  let basicRank = await rankModel.getRankByCode('basic');
+
+  if (!basicRank) {
+    basicRank = await rankModel.createRank({
+      code: 'basic',
+      name: 'basic',
+      description: 'Rank mac dinh cho tai khoan user',
+      status: 'active'
+    });
+  }
+
+  return basicRank ? basicRank.id : null;
+};
+
 const listUsers = async ({ search, status, page, limit }) => {
   const { limit: take, offset, page: currentPage } = buildPagination(page, limit);
 
@@ -225,8 +240,7 @@ const createUser = async ({ name, email, phone, password, status, rankId, role =
 
   let finalRankId = rankId || null;
   if (!finalRankId && !isPrivilegedRole(role)) {
-    const basicRank = await rankModel.getRankByCode('basic');
-    finalRankId = basicRank ? basicRank.id : null;
+    finalRankId = await ensureBasicRankId();
   }
 
   const passwordHash = await hashPassword(password);

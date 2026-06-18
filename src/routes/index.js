@@ -52,6 +52,7 @@ const clientOrderRoutes = require('./client/orderRoutes');
 const clientToolKeyRoutes = require('./client/toolKeyRoutes');
 
 const dashboardRoutes = require('./dashboardRoutes');
+const supportRoutes = require('./supportRoutes');
 
 const router = express.Router();
 
@@ -82,6 +83,7 @@ router.use('/topups', topupRoutes);
 router.use('/banks', bankRoutes);
 router.use('/documents', documentRoutes);
 router.use('/configs', configRoutes);
+router.use('/support', supportRoutes);
 router.use('/admin/tool-packages', toolPackagesRoutes); 
 
 // Client APIs
@@ -103,7 +105,6 @@ router.use('/orders/admin', adminOrderRoutes);
 router.use('/admin/mock-data', mockDataRoutes);
 
 module.exports = router;
-
 
 
 

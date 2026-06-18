@@ -1,5 +1,6 @@
 const ApiError = require('../utils/apiError');
 const userModel = require('../models/userModel');
+const rankModel = require('../models/rankModel');
 const { hashPassword, comparePassword } = require('../utils/password');
 const { signToken } = require('../utils/jwt');
 const crypto = require('crypto');
@@ -42,8 +43,69 @@ const generateRefCode = (userId) => {
   return `REF${userId}${random}`;
 };
 
+const ensureBasicRank = async () => {
+  let basicRank = await rankModel.getRankByCode('basic');
+
+  if (!basicRank) {
+    basicRank = await rankModel.createRank({
+      code: 'basic',
+      name: 'basic',
+      description: 'Rank mac dinh cho tai khoan tu dang ky',
+      status: 'active'
+    });
+  }
+
+  return basicRank;
+};
+
 const register = async ({ name, email, password, phone, ref }) => {
-  throw ApiError.forbidden('Self-registration is disabled. Accounts are created by admin.');
+  const existing = await userModel.getUserByEmail(email);
+  if (existing) {
+    throw ApiError.badRequest('Email already exists');
+  }
+
+  let referrer = null;
+  if (ref && String(ref).trim()) {
+    const refValue = String(ref).trim();
+    referrer = await userModel.getUserByRefCode(refValue);
+
+    if (!referrer && refValue.includes('@')) {
+      referrer = await userModel.getUserByEmail(refValue);
+    }
+
+    if (!referrer) {
+      throw ApiError.badRequest('Mã giới thiệu không hợp lệ');
+    }
+  }
+
+  const basicRank = await ensureBasicRank();
+  const passwordHash = await hashPassword(password);
+  const created = await userModel.createUser({
+    name,
+    email,
+    phone: phone || null,
+    passwordHash,
+    role: 'user',
+    status: 'active',
+    rankId: basicRank ? basicRank.id : null,
+    refBy: referrer ? referrer.id : null,
+    apiToken: generateApiToken()
+  });
+
+  let registeredUser = created;
+  if (!registeredUser.ref_code) {
+    registeredUser = await userModel.updateUser(registeredUser.id, {
+      refCode: generateRefCode(registeredUser.id)
+    });
+  }
+
+  if (referrer) {
+    await userModel.incrementRefCount(referrer.id);
+    registeredUser = await userModel.getUserById(registeredUser.id);
+  }
+
+  const sessionId = sessionService.createSession(registeredUser.id);
+  return buildAuthResponse(registeredUser, sessionId);
 };
 
 const login = async ({ email, password }) => {
