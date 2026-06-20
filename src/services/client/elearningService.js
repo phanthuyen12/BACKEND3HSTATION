@@ -146,9 +146,6 @@ const getCourseById = async (id, user = null) => {
   }
 
   const hasAccess = await canAccessCourse({ course, user });
-  if (!hasAccess) {
-    throw ApiError.forbidden('Bạn không có quyền truy cập khóa học này');
-  }
 
   const sections = await courseSectionModel.getSectionsByCourseId(parseInt(id, 10));
   const sectionsWithLessons = await Promise.all(

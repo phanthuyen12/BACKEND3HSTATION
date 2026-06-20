@@ -64,17 +64,24 @@ const listCourseVideos = async (courseId, user, { sectionId = null, categoryId =
     }
   }
   
-  // Nếu có sectionId cụ thể, có thể là admin đang quản lý nên cho xem tất cả videos
-  // Chỉ filter preview khi không có sectionId và user không có quyền xem full
-  const onlyPreview = !canViewFull && !parsedSectionId;
-  
-  const videos = await videoModel.getVideosByCourseId(parseInt(courseId, 10), { 
-    onlyPreview: onlyPreview,
+  // Always fetch all videos, so the curriculum shows them
+  let videos = await videoModel.getVideosByCourseId(parseInt(courseId, 10), { 
+    onlyPreview: false,
     sectionId: parsedSectionId,
     categoryId: parsedCategoryId
   });
   
-  console.log('listCourseVideos service - courseId:', courseId, 'parsedSectionId:', parsedSectionId, 'onlyPreview:', onlyPreview, 'videos count:', videos?.length);
+  // If user cannot view full course, mask the URLs of non-preview videos
+  if (!canViewFull) {
+    videos = videos.map(v => {
+      if (!v.preview) {
+        return { ...v, url: '' };
+      }
+      return v;
+    });
+  }
+  
+  console.log('listCourseVideos service - courseId:', courseId, 'parsedSectionId:', parsedSectionId, 'videos count:', videos?.length);
   return videos;
 };
 
