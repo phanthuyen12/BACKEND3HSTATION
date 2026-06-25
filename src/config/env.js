@@ -30,7 +30,7 @@ const env = {
     from: process.env.SMTP_FROM || '3HSTATION <noreply@3hstation.com>'
   },
   app: {
-    frontendUrl: process.env.APP_FRONTEND_URL || 'http://localhost:3000'
+    frontendUrl: process.env.APP_FRONTEND_URL || 'https://api.aetrading.vn'
   }
 };
 

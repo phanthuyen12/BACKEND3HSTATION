@@ -29,7 +29,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 app.use(cors({
 
-  origin: 'http://localhost:5173', // frontend URL
+  origin: 'https://academy.aetrading.vn', // frontend URL
   credentials: true, // nếu dùng cookie
 }));
 app.get('/health', (_req, res) => {

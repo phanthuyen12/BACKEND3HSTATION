@@ -15,12 +15,12 @@ npm run migrate
 npm start
 ```
 
-Server sẽ chạy tại: `http://localhost:3000`
+Server sẽ chạy tại: `https://api.aetrading.vn`
 
 ## 2. Đăng ký tài khoản đầu tiên
 
 ```bash
-curl -X POST http://localhost:3000/api/auth/register \
+curl -X POST https://api.aetrading.vn/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Admin User",
@@ -38,7 +38,7 @@ UPDATE users SET role = 'admin' WHERE email = 'admin@example.com';
 ## 3. Đăng nhập và lấy token
 
 ```bash
-curl -X POST http://localhost:3000/api/auth/login \
+curl -X POST https://api.aetrading.vn/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "admin@example.com",
@@ -61,7 +61,7 @@ Authorization: Bearer YOUR_TOKEN_HERE
 ### Tạo danh mục khoá học
 
 ```bash
-curl -X POST http://localhost:3000/api/elearning/categories \
+curl -X POST https://api.aetrading.vn/api/elearning/categories \
   -H "Authorization: Bearer YOUR_TOKEN_HERE" \
   -H "Content-Type: application/json" \
   -d '{
@@ -72,7 +72,7 @@ curl -X POST http://localhost:3000/api/elearning/categories \
 ### Tạo khoá học
 
 ```bash
-curl -X POST http://localhost:3000/api/elearning/courses \
+curl -X POST https://api.aetrading.vn/api/elearning/courses \
   -H "Authorization: Bearer YOUR_TOKEN_HERE" \
   -H "Content-Type: application/json" \
   -d '{
@@ -88,13 +88,13 @@ curl -X POST http://localhost:3000/api/elearning/courses \
 ### Lấy danh sách khoá học (Client - Public)
 
 ```bash
-curl -X GET "http://localhost:3000/api/client/elearning/courses?page=1&limit=20"
+curl -X GET "https://api.aetrading.vn/api/client/elearning/courses?page=1&limit=20"
 ```
 
 ### Tạo gói VPS
 
 ```bash
-curl -X POST http://localhost:3000/api/vps/plans \
+curl -X POST https://api.aetrading.vn/api/vps/plans \
   -H "Authorization: Bearer YOUR_TOKEN_HERE" \
   -H "Content-Type: application/json" \
   -d '{
@@ -113,7 +113,7 @@ curl -X POST http://localhost:3000/api/vps/plans \
 ## 6. Test với Postman
 
 1. Import file `LabTest_API.postman_collection.json` (nếu có)
-2. Set environment variable `base_url` = `http://localhost:3000/api`
+2. Set environment variable `base_url` = `https://api.aetrading.vn/api`
 3. Set environment variable `token` = token từ login response
 4. Chạy các request trong collection
 
