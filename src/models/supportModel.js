@@ -1,12 +1,30 @@
 const { query, execute } = require('../config/database');
 
-const createSupportRequest = async ({ name, email, topic, message, sourcePage }) => {
+const createSupportRequest = async ({
+  name,
+  email,
+  phone,
+  topic,
+  message,
+  sourcePage,
+  refCode,
+  redirectUrl
+}) => {
   const [result] = await execute(
     `
-      INSERT INTO support_requests (name, email, topic, message, source_page)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO support_requests (name, email, phone, topic, message, source_page, ref_code, redirect_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `,
-    [name, email, topic, message, sourcePage || 'landing-contact']
+    [
+      name,
+      email,
+      phone || null,
+      topic,
+      message,
+      sourcePage || 'landing-contact',
+      refCode || null,
+      redirectUrl || null
+    ]
   );
 
   const rows = await query('SELECT * FROM support_requests WHERE id = ?', [result.insertId]);
@@ -28,9 +46,11 @@ const buildWhereClause = ({ status, search, sourcePage }) => {
   }
 
   if (search) {
-    conditions.push('(name LIKE ? OR email LIKE ? OR topic LIKE ? OR message LIKE ?)');
+    conditions.push(
+      '(name LIKE ? OR email LIKE ? OR phone LIKE ? OR topic LIKE ? OR message LIKE ? OR source_page LIKE ? OR ref_code LIKE ? OR redirect_url LIKE ?)'
+    );
     const keyword = `%${search}%`;
-    params.push(keyword, keyword, keyword, keyword);
+    params.push(keyword, keyword, keyword, keyword, keyword, keyword, keyword, keyword);
   }
 
   return {

@@ -25,7 +25,7 @@ const attachSessionSocket = (server) => {
       return;
     }
 
-    if (!sessionService.isSessionActive(decoded.userId, decoded.sessionId)) {
+    if (!sessionService.ensureSession(decoded.userId, decoded.sessionId)) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();
       return;

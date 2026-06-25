@@ -14,9 +14,12 @@ router.post(
     body: Joi.object({
       name: Joi.string().trim().min(2).max(100).required(),
       email: Joi.string().trim().email().required(),
+      phone: Joi.string().trim().max(30).allow("").optional(),
       topic: Joi.string().trim().min(3).max(150).required(),
       message: Joi.string().trim().min(10).max(5000).required(),
-      sourcePage: Joi.string().trim().max(100).optional()
+      sourcePage: Joi.string().trim().max(100).optional(),
+      refCode: Joi.string().trim().max(100).optional(),
+      redirectUrl: Joi.string().trim().max(2000).optional()
     })
   }),
   supportController.createContactRequest

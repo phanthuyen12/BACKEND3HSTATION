@@ -271,12 +271,12 @@ const getRankSummaryForUser = async (userId) => {
       email: user.email,
       rank: rank
         ? {
-            id: String(rank.id),
-            code: rank.code,
-            name: rank.name,
-            description: rank.description,
-            status: rank.status
-          }
+          id: String(rank.id),
+          code: rank.code,
+          name: rank.name,
+          description: rank.description,
+          status: rank.status
+        }
         : null
     },
     accessibleCourses: accessibleCourses.length,
@@ -304,12 +304,12 @@ const getStudentDashboard = async (userId) => {
       email: user.email,
       rank: rank
         ? {
-            id: String(rank.id),
-            code: rank.code,
-            name: rank.name,
-            description: rank.description,
-            status: rank.status
-          }
+          id: String(rank.id),
+          code: rank.code,
+          name: rank.name,
+          description: rank.description,
+          status: rank.status
+        }
         : null
     },
     stats: {
@@ -329,12 +329,12 @@ const getStudentDashboard = async (userId) => {
     progress: progressRows,
     rankSummary: rank
       ? {
-          id: String(rank.id),
-          code: rank.code,
-          name: rank.name,
-          description: rank.description,
-          status: rank.status
-        }
+        id: String(rank.id),
+        code: rank.code,
+        name: rank.name,
+        description: rank.description,
+        status: rank.status
+      }
       : null
   };
 };

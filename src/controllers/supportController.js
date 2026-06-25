@@ -29,9 +29,12 @@ const createContactRequest = asyncHandler(async (req, res) => {
   const payload = {
     name: req.body.name,
     email: req.body.email,
+    phone: req.body.phone,
     topic: req.body.topic,
     message: req.body.message,
-    sourcePage: req.body.sourcePage
+    sourcePage: req.body.sourcePage,
+    refCode: req.body.refCode,
+    redirectUrl: req.body.redirectUrl
   };
 
   const created = await supportModel.createSupportRequest(payload);
@@ -41,19 +44,25 @@ const createContactRequest = asyncHandler(async (req, res) => {
     'Yeu cau ho tro moi tu frontend',
     `Ho ten: ${payload.name}`,
     `Email: ${payload.email}`,
+    payload.phone ? `Dien thoai: ${payload.phone}` : null,
     `Chu de: ${payload.topic}`,
     `Nguon: ${payload.sourcePage || 'landing-contact'}`,
+    payload.refCode ? `Ref: ${payload.refCode}` : null,
+    payload.redirectUrl ? `Link dich: ${payload.redirectUrl}` : null,
     '',
     payload.message
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.7; color: #1f2937;">
       <h2 style="margin-bottom: 12px;">Yeu cau ho tro moi</h2>
       <p><strong>Ho ten:</strong> ${payload.name}</p>
       <p><strong>Email:</strong> ${payload.email}</p>
+      ${payload.phone ? `<p><strong>Dien thoai:</strong> ${payload.phone}</p>` : ''}
       <p><strong>Chu de:</strong> ${payload.topic}</p>
       <p><strong>Nguon:</strong> ${payload.sourcePage || 'landing-contact'}</p>
+      ${payload.refCode ? `<p><strong>Ref:</strong> ${payload.refCode}</p>` : ''}
+      ${payload.redirectUrl ? `<p><strong>Link dich:</strong> ${payload.redirectUrl}</p>` : ''}
       <p><strong>Noi dung:</strong></p>
       <div style="white-space: pre-wrap; padding: 12px; background: #f8fafc; border-radius: 8px;">${payload.message}</div>
     </div>

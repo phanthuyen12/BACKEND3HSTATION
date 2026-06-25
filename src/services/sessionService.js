@@ -29,6 +29,24 @@ const isSessionActive = (userId, sessionId) => {
   return current?.sessionId === sessionId;
 };
 
+const ensureSession = (userId, sessionId) => {
+  if (!userId || !sessionId) return false;
+
+  const normalizedUserId = String(userId);
+  const current = activeSessions.get(normalizedUserId);
+
+  if (current?.sessionId) {
+    return current.sessionId === sessionId;
+  }
+
+  activeSessions.set(normalizedUserId, {
+    sessionId,
+    createdAt: new Date().toISOString()
+  });
+
+  return true;
+};
+
 const clearSession = (userId, sessionId) => {
   if (!userId) return;
   const normalizedUserId = String(userId);
@@ -64,6 +82,14 @@ const notifyUser = (userId, payload, targetSessionId) => {
   });
 };
 
+const broadcast = (payload) => {
+  userSockets.forEach((sockets) => {
+    sockets.forEach((socket) => {
+      sendSocketMessage(socket, payload);
+    });
+  });
+};
+
 const sendSocketMessage = (socket, payload) => {
   if (!socket || socket.destroyed || !socket.writable) return;
   const message = Buffer.from(JSON.stringify(payload));
@@ -89,8 +115,11 @@ const sendSocketMessage = (socket, payload) => {
 
 module.exports = {
   createSession,
+  ensureSession,
   isSessionActive,
   clearSession,
   registerSocket,
+  notifyUser,
+  broadcast,
   sendSocketMessage
 };

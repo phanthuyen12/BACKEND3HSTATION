@@ -10,9 +10,17 @@ const cors = require('cors');
 
 const app = express();
 
+// Run migrations on start
+const runMigrations = require('../migrate_auto');
+runMigrations();
+
 // Khởi tạo các tasks định kỳ
 const { startNodeverseSyncTask } = require('./tasks/nodeverseSyncTask');
+const { startFacebookSyncJob } = require('./tasks/facebookSyncJob');
+const { startFacebookFollowUpTask } = require('./tasks/facebookFollowUpTask');
 startNodeverseSyncTask();
+startFacebookSyncJob();
+startFacebookFollowUpTask();
 
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '10mb' }));
@@ -20,8 +28,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.use(cors({
-  
-  origin: 'https://academy.aetrading.vn', // frontend URL
+
+  origin: 'http://localhost:5173', // frontend URL
   credentials: true, // nếu dùng cookie
 }));
 app.get('/health', (_req, res) => {

@@ -12,8 +12,14 @@ const getAllConfigs = async () => {
 const updateConfigs = async (configs) => {
     const promises = Object.entries(configs).map(([key, value]) => {
         return execute(
-            'UPDATE system_configs SET config_value = ? WHERE config_key = ?',
-            [value, key]
+            `
+              INSERT INTO system_configs (config_key, config_value)
+              VALUES (?, ?)
+              ON DUPLICATE KEY UPDATE
+                config_value = VALUES(config_value),
+                updated_at = CURRENT_TIMESTAMP
+            `,
+            [key, value]
         );
     });
     await Promise.all(promises);

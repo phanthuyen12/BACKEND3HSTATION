@@ -34,7 +34,7 @@ const authenticate = asyncHandler(async (req, _res, next) => {
     throw ApiError.unauthorized('Invalid or expired token');
   }
 
-  if (!sessionService.isSessionActive(decoded.userId, decoded.sessionId)) {
+  if (!sessionService.ensureSession(decoded.userId, decoded.sessionId)) {
     throw ApiError.unauthorized('Session expired because the account signed in on another device');
   }
 
@@ -55,7 +55,7 @@ const optionalAuth = asyncHandler(async (req, _res, next) => {
     const token = header.split(' ')[1];
     try {
       const decoded = verifyToken(token);
-      if (!sessionService.isSessionActive(decoded.userId, decoded.sessionId)) {
+      if (!sessionService.ensureSession(decoded.userId, decoded.sessionId)) {
         return next();
       }
       const user = attachLegacyRankId(await userService.getUserById(decoded.userId));

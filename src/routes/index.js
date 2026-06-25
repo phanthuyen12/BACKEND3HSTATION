@@ -15,6 +15,8 @@ const aiVideoRoutes = require('./aiVideoRoutes');
 // VPS routes
 const vpsPlanRoutes = require('./vps/planRoutes');
 const vpsInstanceRoutes = require('./vps/instanceRoutes');
+
+
 const nodeverseRoutes = require('./vps/nodeverseRoutes');
 const nodeverseVpsRoutes = require('./vps/nodeverseVpsRoutes');
 const nodeverseAdminRoutes = require('./nodeverseAdminRoutes');
@@ -55,6 +57,8 @@ const dashboardRoutes = require('./dashboardRoutes');
 const supportRoutes = require('./supportRoutes');
 
 const router = express.Router();
+const adminFacebookRoutes = require('./adminFacebookRoutes');
+const facebookWebhookRoutes = require('./facebookWebhookRoutes');
 
 // Authentication
 router.use('/auth', authRoutes);
@@ -89,6 +93,7 @@ router.use('/admin/tool-packages', toolPackagesRoutes);
 // Client APIs
 router.use('/client/elearning', clientElearningRoutes);
 router.use('/client/vps/nodeverse', clientNodeverseRoutes);
+
 router.use('/client/vps/nodeverse-plans', clientNodeverseVpsRoutes);
 router.use('/client/vps', clientVpsRoutes);
 router.use('/client/workflows', clientWorkflowRoutes);
@@ -104,6 +109,8 @@ router.use('/orders/admin', adminOrderRoutes);
 // Admin Tooling / Mocking
 router.use('/admin/mock-data', mockDataRoutes);
 
+router.use('/admin/facebook', adminFacebookRoutes);
+router.use('/facebook/webhook', facebookWebhookRoutes);
 module.exports = router;
 
 
