@@ -64,6 +64,10 @@ const registerSocket = (userId, sessionId, socket) => {
   sockets.add(socket);
   userSockets.set(normalizedUserId, sockets);
 
+  socket.on('error', (err) => {
+    console.warn(`[Socket Error] User ${normalizedUserId} socket error:`, err.message);
+  });
+
   socket.on('close', () => {
     sockets.delete(socket);
     if (sockets.size === 0) {

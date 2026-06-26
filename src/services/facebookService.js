@@ -301,6 +301,39 @@ module.exports = {
     ];
   },
 
+  async subscribePageWebhook(pageId, pageAccessToken) {
+    try {
+      const url = `https://graph.facebook.com/v20.0/${pageId}/subscribed_apps`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subscribed_fields: 'messages,messaging_postbacks',
+          access_token: pageAccessToken
+        })
+      });
+      const data = await res.json();
+      console.log(`[Facebook Webhook] Subscribed page ${pageId}:`, data);
+      return data;
+    } catch (err) {
+      console.error(`[Facebook Webhook] Failed to subscribe page ${pageId}:`, err);
+    }
+  },
+
+  async unsubscribePageWebhook(pageId, pageAccessToken) {
+    try {
+      const url = `https://graph.facebook.com/v20.0/${pageId}/subscribed_apps?access_token=${pageAccessToken}`;
+      const res = await fetch(url, { method: 'DELETE' });
+      const data = await res.json();
+      console.log(`[Facebook Webhook] Unsubscribed page ${pageId}:`, data);
+      return data;
+    } catch (err) {
+      console.error(`[Facebook Webhook] Failed to unsubscribe page ${pageId}:`, err);
+    }
+  },
+
   async connectPage(data) {
     const { code, redirectUri } = data;
     if (!code) {
@@ -401,12 +434,18 @@ module.exports = {
           });
           savedPages.push(newPage);
         }
+
+        // Tự động kích hoạt Webhook Subscription trên FB cho page này
+        await this.subscribePageWebhook(page.id, page.access_token);
       }
 
       // 4. Hủy kết nối các Page trước đây đã kết nối nhưng lần này bị bỏ chọn
       const allDbPages = await FacebookPage.listAll();
       for (const dbPage of allDbPages) {
         if (dbPage.status === 'connected' && !incomingPageIds.includes(String(dbPage.pageId))) {
+          if (dbPage.accessToken) {
+            await this.unsubscribePageWebhook(dbPage.pageId, dbPage.accessToken);
+          }
           await FacebookPage.updateConnection(dbPage.id, {
             accessToken: null,
             tokenExpiresAt: null,
@@ -427,6 +466,10 @@ module.exports = {
   async disconnectPage(pageId) {
     const page = await FacebookPage.getByPageId(pageId);
     if (page) {
+      // Hủy đăng ký webhook trên FB trước khi xóa token
+      if (page.accessToken) {
+        await this.unsubscribePageWebhook(page.pageId, page.accessToken);
+      }
       await FacebookPage.updateConnection(page.id, {
         accessToken: null,
         tokenExpiresAt: null,

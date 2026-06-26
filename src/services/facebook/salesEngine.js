@@ -192,11 +192,42 @@ async function processIncomingMessage(pageId, senderId, messageText, page) {
       inputs
     });
   } catch (error) {
-    console.error('[SalesEngine] Lỗi gọi Dify. Gửi tin nhắn fallback lỗi.', error);
-    difyResult = {
-      answer: "Dạ hệ thống AI tư vấn đang bận trong giây lát, chuyên viên của chúng tôi sẽ liên hệ hỗ trợ anh/chị ngay nhé!",
-      conversationId: updatedLead.difyConversationId
-    };
+    const isConvNotFoundError = error.message && (
+      error.message.includes("Conversation Not Exists") ||
+      error.message.includes("not_found")
+    );
+
+    if (isConvNotFoundError && updatedLead.difyConversationId) {
+      console.warn(`[SalesEngine] Dify Conversation ${updatedLead.difyConversationId} không tồn tại. Tự động xóa và tạo hội thoại mới...`);
+      await FacebookLead.updateLead(updatedLead.id, { difyConversationId: null });
+      
+      try {
+        const inputs = {
+          lead_status: updatedLead.leadStatus,
+          phone: updatedLead.phone || 'Chưa có',
+          course_interest: updatedLead.courseInterest || 'Chưa có'
+        };
+        difyResult = await difyService.sendChatMessage({
+          query: messageText,
+          facebookUserId: senderId,
+          conversationId: null,
+          page,
+          inputs
+        });
+      } catch (retryError) {
+        console.error('[SalesEngine] Lỗi gọi Dify sau khi xóa Conversation ID.', retryError);
+        difyResult = {
+          answer: "Dạ hệ thống AI tư vấn đang bận trong giây lát, chuyên viên của chúng tôi sẽ liên hệ hỗ trợ anh/chị ngay nhé!",
+          conversationId: null
+        };
+      }
+    } else {
+      console.error('[SalesEngine] Lỗi gọi Dify. Gửi tin nhắn fallback lỗi.', error);
+      difyResult = {
+        answer: "Dạ hệ thống AI tư vấn đang bận trong giây lát, chuyên viên của chúng tôi sẽ liên hệ hỗ trợ anh/chị ngay nhé!",
+        conversationId: updatedLead.difyConversationId
+      };
+    }
   }
 
   const { answer, conversationId } = difyResult;
