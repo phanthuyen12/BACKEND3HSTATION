@@ -26,7 +26,7 @@ function mapRow(row) {
 }
 
 async function createPage({ pageId, pageName, avatarUrl, accessToken, tokenExpiresAt, connectedByUserId, status = 'connected' }) {
-  const encryptedToken = encrypt(accessToken);
+  const encryptedToken = accessToken ? encrypt(accessToken) : null;
   const sql = `INSERT INTO facebook_pages 
     (page_id, page_name, avatar_url, access_token, token_expires_at, connected_by_user_id, status)
     VALUES (?, ?, ?, ?, ?, ?, ?)`;
@@ -69,7 +69,7 @@ async function updateAiConfig(id, { difyApiKey, difyApiUrl, aiEnabled, salesEngi
 }
 
 async function updateConnection(id, { accessToken, tokenExpiresAt, status = 'connected', pageName, avatarUrl }) {
-  const encryptedToken = encrypt(accessToken);
+  const encryptedToken = accessToken ? encrypt(accessToken) : null;
   const sql = `UPDATE facebook_pages SET 
     access_token = ?, 
     token_expires_at = ?, 

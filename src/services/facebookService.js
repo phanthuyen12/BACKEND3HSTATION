@@ -372,6 +372,8 @@ module.exports = {
       }
 
       const savedPages = [];
+      const incomingPageIds = accountsData.data.map(p => String(p.id));
+
       // 3. Cập nhật danh sách Page vào DB
       for (const page of accountsData.data) {
         const existing = await FacebookPage.getByPageId(page.id);
@@ -401,6 +403,20 @@ module.exports = {
         }
       }
 
+      // 4. Hủy kết nối các Page trước đây đã kết nối nhưng lần này bị bỏ chọn
+      const allDbPages = await FacebookPage.listAll();
+      for (const dbPage of allDbPages) {
+        if (dbPage.status === 'connected' && !incomingPageIds.includes(String(dbPage.pageId))) {
+          await FacebookPage.updateConnection(dbPage.id, {
+            accessToken: null,
+            tokenExpiresAt: null,
+            status: 'disconnected',
+            pageName: dbPage.pageName,
+            avatarUrl: dbPage.avatarUrl
+          });
+        }
+      }
+
       return { success: true, pages: savedPages };
     } catch (error) {
       console.error("Facebook OAuth Error:", error);
@@ -411,7 +427,13 @@ module.exports = {
   async disconnectPage(pageId) {
     const page = await FacebookPage.getByPageId(pageId);
     if (page) {
-      await FacebookPage.updateStatus(page.id, 'disconnected');
+      await FacebookPage.updateConnection(page.id, {
+        accessToken: null,
+        tokenExpiresAt: null,
+        status: 'disconnected',
+        pageName: page.pageName,
+        avatarUrl: page.avatarUrl
+      });
     }
     return { success: true, pageId };
   },
@@ -452,7 +474,7 @@ module.exports = {
       throw new Error("Page chưa được kết nối.");
     }
     
-    if (!page.accessToken || page.accessToken === 'mock_token') {
+    if (!page.accessToken || page.accessToken === 'mock_token' || page.status === 'disconnected') {
       // Mock page details
       return {
         id: page.pageId,
@@ -462,7 +484,8 @@ module.exports = {
         fan_count: 10400,
         about: 'Trang đào tạo Trading tài chính 3HSTATION',
         category: 'Education',
-        link: 'https://facebook.com/3hstation'
+        link: 'https://facebook.com/3hstation',
+        status: page.status
       };
     }
 
@@ -471,7 +494,20 @@ module.exports = {
       const res = await fetch(url);
       const data = await res.json();
 
-      if (data.error) throw new Error(data.error.message);
+      if (data.error) {
+        // Tự động chuyển đổi trạng thái thành disconnected nếu gặp lỗi OAuthException từ Facebook
+        if (data.error.type === 'OAuthException' || (data.error.message && data.error.message.includes('token'))) {
+          console.warn(`[Facebook API] Token cho Page ${pageId} không hợp lệ, tự động hủy kết nối. Chi tiết: ${data.error.message}`);
+          await FacebookPage.updateConnection(page.id, {
+            accessToken: null,
+            tokenExpiresAt: null,
+            status: 'disconnected',
+            pageName: page.pageName,
+            avatarUrl: page.avatarUrl
+          });
+        }
+        throw new Error(data.error.message);
+      }
 
       return {
         id: data.id,
@@ -481,7 +517,8 @@ module.exports = {
         fan_count: data.fan_count || 0,
         about: data.about || '',
         category: data.category || '',
-        link: data.link || `https://facebook.com/${data.id}`
+        link: data.link || `https://facebook.com/${data.id}`,
+        status: 'connected'
       };
     } catch (error) {
       console.error("Lỗi khi lấy thông tin Page:", error);
