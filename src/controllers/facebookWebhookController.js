@@ -84,7 +84,11 @@ async function receiveWebhookEvent(req, res) {
             });
 
             // Đẩy vào hàng đợi xử lý bất đồng bộ
-            facebookQueue.enqueueMessage(recipientId, senderId, messageText, page);
+            facebookQueue.enqueueMessage(recipientId, senderId, messageText, page, {
+              createdTime: event.timestamp
+                ? new Date(event.timestamp).toISOString()
+                : new Date().toISOString(),
+            });
           }
         }
       }

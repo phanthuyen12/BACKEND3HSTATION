@@ -110,10 +110,16 @@ function analyzeMessage(lead, text) {
  * @param {string} messageText - Nội dung khách nhắn
  * @param {Object} page - Object cấu hình Fanpage lấy từ DB
  */
-async function processIncomingMessage(pageId, senderId, messageText, page) {
+async function processIncomingMessage(pageId, senderId, messageText, page, options = {}) {
   if (!messageText) return;
 
-  console.log(`[SalesEngine] Bắt đầu xử lý tin nhắn cho user ${senderId} trên Page ${pageId}`);
+  const createdTime = options.createdTime || new Date().toISOString();
+  const skipIncomingBroadcast = Boolean(options.skipIncomingBroadcast);
+  const messageCount = Number(options.messageCount || 1);
+
+  console.log(
+    `[SalesEngine] Bắt đầu xử lý ${messageCount} tin nhắn cho user ${senderId} trên Page ${pageId}`
+  );
 
   // 1. Tìm hoặc tạo Lead
   let lead = await FacebookLead.getByPageAndUser(pageId, senderId);
@@ -145,15 +151,18 @@ async function processIncomingMessage(pageId, senderId, messageText, page) {
       followUpSent: 0
     });
 
-    const refreshedLead = await FacebookLead.getById(lead.id);
-    broadcastCrmMessage({
-      event: 'incoming',
-      source: 'user',
-      pageId,
-      facebookUserId: senderId,
-      lead: refreshedLead || lead,
-      message: messageText,
-    });
+    if (!skipIncomingBroadcast) {
+      const refreshedLead = await FacebookLead.getById(lead.id);
+      broadcastCrmMessage({
+        event: 'incoming',
+        source: 'user',
+        pageId,
+        facebookUserId: senderId,
+        lead: refreshedLead || lead,
+        message: messageText,
+        createdTime,
+      });
+    }
     return;
   }
 
@@ -166,14 +175,17 @@ async function processIncomingMessage(pageId, senderId, messageText, page) {
     updatedLead = await FacebookLead.updateLead(lead.id, leadUpdates);
   }
 
-  broadcastCrmMessage({
-    event: 'incoming',
-    source: 'user',
-    pageId,
-    facebookUserId: senderId,
-    lead: updatedLead,
-    message: messageText,
-  });
+  if (!skipIncomingBroadcast) {
+    broadcastCrmMessage({
+      event: 'incoming',
+      source: 'user',
+      pageId,
+      facebookUserId: senderId,
+      lead: updatedLead,
+      message: messageText,
+      createdTime,
+    });
+  }
 
   // 4. Gọi Dify lấy câu trả lời
   let difyResult;
