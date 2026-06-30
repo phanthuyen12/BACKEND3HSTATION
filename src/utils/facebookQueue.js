@@ -9,6 +9,10 @@ const MAX_BATCH_MESSAGES = Math.max(
   1,
   Number(process.env.FACEBOOK_MESSAGE_BATCH_MAX_MESSAGES || 5)
 );
+const MAX_BATCH_CHARACTERS = Math.max(
+  200,
+  Number(process.env.FACEBOOK_MESSAGE_BATCH_MAX_CHARACTERS || 4000)
+);
 
 // Map chứa hàng đợi tin nhắn của từng user
 // Key: `${pageId}:${senderId}`
@@ -21,6 +25,57 @@ function sleep(ms) {
 
 function buildQueueKey(pageId, senderId) {
   return `${pageId}:${senderId}`;
+}
+
+function buildCombinedMessage(batchItems) {
+  const normalizedMessages = batchItems
+    .map((item) => item.messageText?.trim())
+    .filter(Boolean);
+
+  if (normalizedMessages.length === 0) {
+    return '';
+  }
+
+  const recentMessages =
+    normalizedMessages.length > MAX_BATCH_MESSAGES
+      ? normalizedMessages.slice(-MAX_BATCH_MESSAGES)
+      : normalizedMessages;
+
+  if (recentMessages.length !== normalizedMessages.length) {
+    console.log(
+      `[Queue Worker] Rút gọn ngữ cảnh từ ${normalizedMessages.length} xuống ${recentMessages.length} tin nhắn gần nhất trước khi gọi AI.`
+    );
+  }
+
+  const combinedMessage = recentMessages.join('\n');
+  if (combinedMessage.length <= MAX_BATCH_CHARACTERS) {
+    return combinedMessage;
+  }
+
+  const trimmedMessages = [];
+  let totalLength = 0;
+
+  for (let i = recentMessages.length - 1; i >= 0; i -= 1) {
+    const message = recentMessages[i];
+    const nextLength = totalLength + message.length + (trimmedMessages.length > 0 ? 1 : 0);
+
+    if (nextLength > MAX_BATCH_CHARACTERS && trimmedMessages.length > 0) {
+      break;
+    }
+
+    trimmedMessages.unshift(message.slice(-(MAX_BATCH_CHARACTERS - totalLength)));
+    totalLength = trimmedMessages.join('\n').length;
+
+    if (totalLength >= MAX_BATCH_CHARACTERS) {
+      break;
+    }
+  }
+
+  console.log(
+    `[Queue Worker] Rút gọn nội dung batch còn ${totalLength} ký tự để tránh prompt quá dài.`
+  );
+
+  return trimmedMessages.join('\n');
 }
 
 async function waitForQuietPeriod(queue) {
@@ -85,17 +140,14 @@ async function processQueue(queueKey) {
     while (queue.items.length > 0) {
       await waitForQuietPeriod(queue);
 
-      const batchItems = queue.items.splice(0, MAX_BATCH_MESSAGES);
+      const batchItems = queue.items.splice(0, queue.items.length);
       if (batchItems.length === 0) {
         continue;
       }
 
       const firstItem = batchItems[0];
       const lastItem = batchItems[batchItems.length - 1];
-      const combinedMessage = batchItems
-        .map((item) => item.messageText?.trim())
-        .filter(Boolean)
-        .join('\n');
+      const combinedMessage = buildCombinedMessage(batchItems);
 
       if (!combinedMessage) {
         continue;
@@ -113,7 +165,15 @@ async function processQueue(queueKey) {
           {
             createdTime: lastItem.createdTime,
             skipIncomingBroadcast: true,
-            messageCount: batchItems.length
+            messageCount: batchItems.length,
+            shouldSkipReply: () => {
+              const currentQueue = userQueues.get(queueKey);
+              if (!currentQueue) {
+                return false;
+              }
+
+              return currentQueue.items.length > 0;
+            }
           }
         );
       } catch (err) {
@@ -129,6 +189,8 @@ async function processQueue(queueKey) {
     // Xóa map key nếu rỗng để tiết kiệm bộ nhớ
     if (queue.items.length === 0) {
       userQueues.delete(queueKey);
+    } else {
+      processQueue(queueKey);
     }
     console.log(`[Queue Worker] Hoàn thành xử lý hàng đợi ${queueKey}`);
   }

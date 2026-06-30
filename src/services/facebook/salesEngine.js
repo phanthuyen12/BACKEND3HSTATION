@@ -28,6 +28,20 @@ function broadcastCrmMessage({
   });
 }
 
+function buildReplyMessages(answer, { collapseToSingleMessage = false } = {}) {
+  const segments = String(answer || '')
+    .split('[SPLIT]')
+    .map((message) => message.trim())
+    .filter(Boolean);
+
+  if (!collapseToSingleMessage) {
+    return segments;
+  }
+
+  const mergedMessage = segments.join('\n\n').trim();
+  return mergedMessage ? [mergedMessage] : [];
+}
+
 /**
  * Phân tích nội dung tin nhắn để chuyển trạng thái Lead
  * @param {Object} lead - Thông tin Lead hiện tại
@@ -116,6 +130,8 @@ async function processIncomingMessage(pageId, senderId, messageText, page, optio
   const createdTime = options.createdTime || new Date().toISOString();
   const skipIncomingBroadcast = Boolean(options.skipIncomingBroadcast);
   const messageCount = Number(options.messageCount || 1);
+  const shouldSkipReply =
+    typeof options.shouldSkipReply === 'function' ? options.shouldSkipReply : null;
 
   console.log(
     `[SalesEngine] Bắt đầu xử lý ${messageCount} tin nhắn cho user ${senderId} trên Page ${pageId}`
@@ -269,13 +285,45 @@ async function processIncomingMessage(pageId, senderId, messageText, page, optio
     await FacebookLead.updateLead(updatedLead.id, { difyConversationId: conversationId });
   }
 
+  if (shouldSkipReply && shouldSkipReply()) {
+    console.log(
+      `[SalesEngine] Bỏ qua phản hồi cũ cho user ${senderId} vì đã có tin nhắn mới trong hàng đợi.`
+    );
+
+    await FacebookChatLog.createLog({
+      pageId,
+      facebookUserId: senderId,
+      messageUser: messageText,
+      difyConversationId: conversationId,
+      leadStatus: updatedLead.leadStatus
+    });
+
+    await FacebookLead.updateLead(updatedLead.id, {
+      lastMessageSender: 'user',
+      lastMessageAt: new Date(),
+      followUpSent: 0
+    });
+
+    return;
+  }
+
   // 6. Gửi câu trả lời trả về Facebook Messenger
+  const messages = buildReplyMessages(answer, {
+    collapseToSingleMessage: messageCount > 1
+  });
+  const sentMessages = [];
+
   try {
-    // Hỗ trợ chia nhỏ câu trả lời bằng ký hiệu [SPLIT] (tránh chia nhỏ bằng \n\n gây spam)
-    const messages = answer.split('[SPLIT]').map(m => m.trim()).filter(m => m.length > 0);
-    
     for (let i = 0; i < messages.length; i++) {
+      if (shouldSkipReply && shouldSkipReply()) {
+        console.log(
+          `[SalesEngine] Dừng gửi tiếp phản hồi cho user ${senderId} vì đã có tin nhắn mới trong hàng đợi.`
+        );
+        break;
+      }
+
       await facebookService.sendFacebookMessage(pageId, senderId, messages[i]);
+      sentMessages.push(messages[i]);
       // Nghỉ 1.5s giữa các tin nhắn để tạo cảm giác gõ phím chân thật
       if (i < messages.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 1500));
@@ -286,31 +334,34 @@ async function processIncomingMessage(pageId, senderId, messageText, page, optio
   }
 
   // 7. Lưu chat log
+  const deliveredAnswer = sentMessages.join('[SPLIT]');
   await FacebookChatLog.createLog({
     pageId,
     facebookUserId: senderId,
     messageUser: messageText,
-    messageBot: answer,
+    messageBot: deliveredAnswer || null,
     difyConversationId: conversationId,
     leadStatus: updatedLead.leadStatus
   });
 
   // 8. Cập nhật trạng thái tin nhắn cuối cùng trên Lead
   await FacebookLead.updateLead(updatedLead.id, {
-    lastMessageSender: 'bot',
+    lastMessageSender: sentMessages.length > 0 ? 'bot' : 'user',
     lastMessageAt: new Date(),
     followUpSent: 0
   });
 
-  const refreshedLead = await FacebookLead.getById(updatedLead.id);
-  broadcastCrmMessage({
-    event: 'outgoing',
-    source: 'bot',
-    pageId,
-    facebookUserId: senderId,
-    lead: refreshedLead || updatedLead,
-    message: answer,
-  });
+  if (sentMessages.length > 0) {
+    const refreshedLead = await FacebookLead.getById(updatedLead.id);
+    broadcastCrmMessage({
+      event: 'outgoing',
+      source: 'bot',
+      pageId,
+      facebookUserId: senderId,
+      lead: refreshedLead || updatedLead,
+      message: deliveredAnswer,
+    });
+  }
 
   console.log(`[SalesEngine] Hoàn thành xử lý tin nhắn cho user ${senderId}`);
 }
