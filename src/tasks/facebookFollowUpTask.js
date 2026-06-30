@@ -10,7 +10,8 @@ const { query } = require('../config/database');
 const CHECK_INTERVAL_CRON = '*/1 * * * *';
 
 function startFacebookFollowUpTask() {
-  console.log(`[Task] Khởi tạo Facebook Follow-up Task (cron: ${CHECK_INTERVAL_CRON})`);
+  console.log(`[Task] Facebook Follow-up Task đã bị tắt theo cấu hình.`);
+  return; // Đã tắt tính năng tự động nhắn khi khách im lặng
   
   cron.schedule(CHECK_INTERVAL_CRON, async () => {
     try {

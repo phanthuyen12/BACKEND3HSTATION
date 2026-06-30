@@ -39,9 +39,12 @@ async function sendChatMessage({ query, facebookUserId, conversationId = null, p
       inputs: inputs || {},
       query: query,
       response_mode: 'blocking',
-      user: facebookUserId,
-      conversation_id: conversationId || ''
+      user: facebookUserId
     };
+
+    if (conversationId && String(conversationId).trim() !== '') {
+      payload.conversation_id = String(conversationId).trim();
+    }
 
     console.log(`[Dify] Calling Dify API at ${endpoint} for user ${facebookUserId}, conversation_id: ${conversationId}`);
     

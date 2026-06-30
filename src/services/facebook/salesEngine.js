@@ -216,17 +216,37 @@ async function processIncomingMessage(pageId, senderId, messageText, page) {
         });
       } catch (retryError) {
         console.error('[SalesEngine] Lỗi gọi Dify sau khi xóa Conversation ID.', retryError);
-        difyResult = {
-          answer: "Dạ hệ thống AI tư vấn đang bận trong giây lát, chuyên viên của chúng tôi sẽ liên hệ hỗ trợ anh/chị ngay nhé!",
-          conversationId: null
-        };
+        // Lưu log & cập nhật lead dạng user gửi rồi dừng lại (im lặng)
+        await FacebookChatLog.createLog({
+          pageId,
+          facebookUserId: senderId,
+          messageUser: messageText,
+          difyConversationId: null,
+          leadStatus: updatedLead.leadStatus
+        });
+        await FacebookLead.updateLead(updatedLead.id, {
+          lastMessageSender: 'user',
+          lastMessageAt: new Date(),
+          followUpSent: 0
+        });
+        return;
       }
     } else {
-      console.error('[SalesEngine] Lỗi gọi Dify. Gửi tin nhắn fallback lỗi.', error);
-      difyResult = {
-        answer: "Dạ hệ thống AI tư vấn đang bận trong giây lát, chuyên viên của chúng tôi sẽ liên hệ hỗ trợ anh/chị ngay nhé!",
-        conversationId: updatedLead.difyConversationId
-      };
+      console.error('[SalesEngine] Lỗi gọi Dify. Dừng xử lý và im lặng.', error);
+      // Lưu log & cập nhật lead dạng user gửi rồi dừng lại (im lặng)
+      await FacebookChatLog.createLog({
+        pageId,
+        facebookUserId: senderId,
+        messageUser: messageText,
+        difyConversationId: updatedLead.difyConversationId,
+        leadStatus: updatedLead.leadStatus
+      });
+      await FacebookLead.updateLead(updatedLead.id, {
+        lastMessageSender: 'user',
+        lastMessageAt: new Date(),
+        followUpSent: 0
+      });
+      return;
     }
   }
 
@@ -239,8 +259,8 @@ async function processIncomingMessage(pageId, senderId, messageText, page) {
 
   // 6. Gửi câu trả lời trả về Facebook Messenger
   try {
-    // Hỗ trợ chia nhỏ câu trả lời bằng ký hiệu [SPLIT] hoặc 2 dấu xuống dòng
-    const messages = answer.split(/\[SPLIT\]|\n\n/).map(m => m.trim()).filter(m => m.length > 0);
+    // Hỗ trợ chia nhỏ câu trả lời bằng ký hiệu [SPLIT] (tránh chia nhỏ bằng \n\n gây spam)
+    const messages = answer.split('[SPLIT]').map(m => m.trim()).filter(m => m.length > 0);
     
     for (let i = 0; i < messages.length; i++) {
       await facebookService.sendFacebookMessage(pageId, senderId, messages[i]);

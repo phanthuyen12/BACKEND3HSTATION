@@ -20,7 +20,7 @@ const { startFacebookSyncJob } = require('./tasks/facebookSyncJob');
 const { startFacebookFollowUpTask } = require('./tasks/facebookFollowUpTask');
 startNodeverseSyncTask();
 startFacebookSyncJob();
-startFacebookFollowUpTask();
+// startFacebookFollowUpTask();
 
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '10mb' }));
