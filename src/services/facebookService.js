@@ -335,7 +335,53 @@ module.exports = {
   },
 
   async connectPage(data) {
-    const { code, redirectUri } = data;
+    const { code, redirectUri, pageId } = data;
+
+    // Handle direct page connection/reconnection by pageId (useful for UI/Mock flow)
+    if (pageId) {
+      if (pageId === 'mock1' || pageId === 'page1') {
+        const mockPageId = 'page1';
+        let existing = await FacebookPage.getByPageId(mockPageId);
+        if (!existing) {
+          existing = await FacebookPage.createPage({
+            pageId: mockPageId,
+            pageName: 'Mock Page (Đã kết nối)',
+            avatarUrl: 'https://graph.facebook.com/v20.0/mock/picture',
+            accessToken: 'mock_token',
+            tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+            connectedByUserId: 1,
+            status: 'connected'
+          });
+        } else {
+          await FacebookPage.updateConnection(existing.id, {
+            accessToken: 'mock_token',
+            tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+            status: 'connected',
+            pageName: 'Mock Page (Đã kết nối)',
+            avatarUrl: 'https://graph.facebook.com/v20.0/mock/picture'
+          });
+          existing = await FacebookPage.getByPageId(mockPageId);
+        }
+        return { success: true, pages: [existing] };
+      }
+
+      let page = await FacebookPage.getById(pageId);
+      if (!page) {
+        page = await FacebookPage.getByPageId(pageId);
+      }
+      if (page) {
+        await FacebookPage.updateConnection(page.id, {
+          accessToken: page.accessToken || 'mock_token',
+          tokenExpiresAt: page.tokenExpiresAt || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          status: 'connected',
+          pageName: page.pageName,
+          avatarUrl: page.avatarUrl
+        });
+        const updated = await FacebookPage.getById(page.id);
+        return { success: true, pages: [updated] };
+      }
+    }
+
     if (!code) {
       throw new Error("Missing OAuth code");
     }
@@ -346,16 +392,16 @@ module.exports = {
     if (!appId || !appSecret) {
       console.warn("FACEBOOK_APP_ID hoặc FACEBOOK_APP_SECRET chưa được cấu hình. Sử dụng mock data.");
       // MOCK: Lưu trang demo vào database nếu chưa cấu hình App ID
-      const pageId = `page_${Date.now()}`;
+      const mockPageId = `page_${Date.now()}`;
       
       // Kiểm tra xem đã có page nào chưa để tránh duplicate key
-      const existing = await FacebookPage.getByPageId(pageId);
+      const existing = await FacebookPage.getByPageId(mockPageId);
       if (existing) {
         return { success: true, pages: [existing] };
       }
       
       const mockPage = await FacebookPage.createPage({
-        pageId,
+        pageId: mockPageId,
         pageName: 'Demo Connected Page',
         avatarUrl: 'https://graph.facebook.com/v20.0/mock/picture',
         accessToken: 'mock_token',
