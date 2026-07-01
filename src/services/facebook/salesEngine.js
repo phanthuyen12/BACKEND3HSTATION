@@ -4,6 +4,11 @@ const FacebookChatLog = require('../../models/facebook/FacebookChatLog');
 const facebookService = require('../facebookService');
 const difyService = require('../difyService');
 const sessionService = require('../sessionService');
+const {
+  analyzeLeadUpdates,
+  finalizeConversationState,
+  prepareConversationState,
+} = require('./difyFlowState');
 
 function broadcastCrmMessage({
   event,
@@ -42,79 +47,8 @@ function buildReplyMessages(answer, { collapseToSingleMessage = false } = {}) {
   return mergedMessage ? [mergedMessage] : [];
 }
 
-/**
- * Phân tích nội dung tin nhắn để chuyển trạng thái Lead
- * @param {Object} lead - Thông tin Lead hiện tại
- * @param {string} text - Tin nhắn khách gửi
- * @returns {Object} Các trường cần cập nhật trên Lead
- */
-function analyzeMessage(lead, text) {
-  const cleanText = text.toLowerCase().trim();
-  const updates = {};
-  let currentStatus = lead.leadStatus || 'new_lead';
-
-  // 1. Kiểm tra số điện thoại (Regex VN mobile phone, hỗ trợ dấu cách, dấu chấm, dấu gạch và mã nước +84/84)
-  const cleanStr = cleanText.replace(/[\s.\-_()]/g, '');
-  const phoneRegex = /(?:\+84|84|0)(3|5|7|8|9)[0-9]{8}\b/;
-  const phoneMatch = cleanStr.match(phoneRegex);
-  if (phoneMatch) {
-    const matchedNumber = phoneMatch[0];
-    let normalized = matchedNumber;
-    if (matchedNumber.startsWith('+84')) {
-      normalized = '0' + matchedNumber.slice(3);
-    } else if (matchedNumber.startsWith('84')) {
-      normalized = '0' + matchedNumber.slice(2);
-    }
-    updates.phone = normalized;
-    currentStatus = 'asked_phone';
-  }
-
-  // 2. Kiểm tra khóa học quan tâm
-  let detectedCourse = null;
-  if (cleanText.includes('trading') || cleanText.includes('trade') || cleanText.includes('giao dịch')) {
-    detectedCourse = 'Trading';
-  } else if (cleanText.includes('ai') || cleanText.includes('trí tuệ nhân tạo')) {
-    detectedCourse = 'AI';
-  } else if (cleanText.includes('marketing') || cleanText.includes('ads') || cleanText.includes('quảng cáo')) {
-    detectedCourse = 'Marketing';
-  }
-
-  if (detectedCourse) {
-    updates.courseInterest = detectedCourse;
-    if (currentStatus === 'new_lead') {
-      currentStatus = 'asked_course';
-    }
-  }
-
-  // 3. Kiểm tra level/kinh nghiệm
-  const levelKeywords = ['mới bắt đầu', 'chưa biết gì', 'basic', 'đã trade', 'kinh nghiệm', 'nâng cao', 'pro', 'newbie'];
-  const hasLevelKeyword = levelKeywords.some(keyword => cleanText.includes(keyword));
-  if (hasLevelKeyword && currentStatus === 'asked_course') {
-    currentStatus = 'asked_level';
-  }
-
-  // 4. Kiểm tra ngân sách/hỏi học phí
-  const budgetKeywords = ['bao nhiêu', 'giá', 'học phí', 'tiền', 'vnd', 'usd', 'tốn phí'];
-  const hasBudgetKeyword = budgetKeywords.some(keyword => cleanText.includes(keyword));
-  if (hasBudgetKeyword && (currentStatus === 'asked_level' || currentStatus === 'asked_course' || currentStatus === 'new_lead')) {
-    // Chỉ nâng lên asked_budget nếu trước đó đã hỏi course/level, hoặc giữ nguyên nếu hỏi thẳng học phí
-    if (currentStatus === 'asked_level') {
-      currentStatus = 'asked_budget';
-    }
-  }
-
-  // 5. Tự động chuyển giao (Ready to handoff) nếu đã có SĐT và khóa học quan tâm
-  const finalPhone = updates.phone || lead.phone;
-  const finalCourse = updates.courseInterest || lead.courseInterest;
-  if (finalPhone && finalCourse) {
-    currentStatus = 'ready_to_handoff';
-  }
-
-  if (currentStatus !== lead.leadStatus) {
-    updates.leadStatus = currentStatus;
-  }
-
-  return updates;
+function analyzeMessage(lead, text, conversationState) {
+  return analyzeLeadUpdates(lead, text, conversationState);
 }
 
 /**
@@ -183,7 +117,15 @@ async function processIncomingMessage(pageId, senderId, messageText, page, optio
   }
 
   // 3. Chạy phân tích tin nhắn và cập nhật trạng thái Sales Engine
-  const leadUpdates = analyzeMessage(lead, messageText);
+  const historyLogs = await FacebookChatLog.listRecentChatHistory(pageId, senderId, { limit: 6 });
+  const conversationState = prepareConversationState(lead, messageText, historyLogs);
+  const leadUpdates = {
+    ...analyzeMessage(lead, messageText, conversationState),
+    currentIntent: conversationState.currentIntent,
+    currentStage: conversationState.currentStage,
+    lastQuestionAsked: conversationState.lastQuestionAsked,
+    sessionMemory: conversationState.sessionMemory,
+  };
   let updatedLead = lead;
   
   if (Object.keys(leadUpdates).length > 0) {
@@ -209,7 +151,8 @@ async function processIncomingMessage(pageId, senderId, messageText, page, optio
     const inputs = {
       lead_status: updatedLead.leadStatus,
       phone: updatedLead.phone || 'Chưa có',
-      course_interest: updatedLead.courseInterest || 'Chưa có'
+      course_interest: updatedLead.courseInterest || 'Chưa có',
+      ...conversationState.inputs,
     };
 
     difyResult = await difyService.sendChatMessage({
@@ -233,7 +176,8 @@ async function processIncomingMessage(pageId, senderId, messageText, page, optio
         const inputs = {
           lead_status: updatedLead.leadStatus,
           phone: updatedLead.phone || 'Chưa có',
-          course_interest: updatedLead.courseInterest || 'Chưa có'
+          course_interest: updatedLead.courseInterest || 'Chưa có',
+          ...conversationState.inputs,
         };
         difyResult = await difyService.sendChatMessage({
           query: messageText,
@@ -345,7 +289,21 @@ async function processIncomingMessage(pageId, senderId, messageText, page, optio
   });
 
   // 8. Cập nhật trạng thái tin nhắn cuối cùng trên Lead
+  const finalizedConversationState = finalizeConversationState({
+    currentIntent: updatedLead.currentIntent || conversationState.currentIntent,
+    currentStage: updatedLead.currentStage || conversationState.currentStage,
+    previousLastQuestionAsked:
+      updatedLead.lastQuestionAsked || conversationState.lastQuestionAsked,
+    historyLogs,
+    messageText,
+    deliveredAnswer: sentMessages.length > 0 ? deliveredAnswer : null,
+  });
+
   await FacebookLead.updateLead(updatedLead.id, {
+    currentIntent: finalizedConversationState.currentIntent,
+    currentStage: finalizedConversationState.currentStage,
+    lastQuestionAsked: finalizedConversationState.lastQuestionAsked,
+    sessionMemory: finalizedConversationState.sessionMemory,
     lastMessageSender: sentMessages.length > 0 ? 'bot' : 'user',
     lastMessageAt: new Date(),
     followUpSent: 0

@@ -12,6 +12,10 @@ function mapRow(row) {
     notes: row.notes,
     phone: row.phone,
     courseInterest: row.course_interest,
+    currentIntent: row.current_intent,
+    currentStage: row.current_stage,
+    lastQuestionAsked: row.last_question_asked,
+    sessionMemory: row.session_memory,
     tags: row.tags,
     saleAgent: row.sale_agent,
     lastMessageSender: row.last_message_sender,
@@ -22,11 +26,41 @@ function mapRow(row) {
   };
 }
 
-async function createLead({ pageId, facebookUserId, difyConversationId = null, leadStatus = 'new_lead', aiEnabled = 1, notes = null, phone = null, courseInterest = null, tags = null, saleAgent = null }) {
+async function createLead({
+  pageId,
+  facebookUserId,
+  difyConversationId = null,
+  leadStatus = 'new_lead',
+  aiEnabled = 1,
+  notes = null,
+  phone = null,
+  courseInterest = null,
+  currentIntent = null,
+  currentStage = null,
+  lastQuestionAsked = null,
+  sessionMemory = null,
+  tags = null,
+  saleAgent = null
+}) {
   const sql = `INSERT INTO facebook_leads 
-    (page_id, facebook_user_id, dify_conversation_id, lead_status, ai_enabled, notes, phone, course_interest, tags, sale_agent)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-  const [result] = await execute(sql, [pageId, facebookUserId, difyConversationId, leadStatus, aiEnabled, notes, phone, courseInterest, tags, saleAgent]);
+    (page_id, facebook_user_id, dify_conversation_id, lead_status, ai_enabled, notes, phone, course_interest, current_intent, current_stage, last_question_asked, session_memory, tags, sale_agent)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const [result] = await execute(sql, [
+    pageId,
+    facebookUserId,
+    difyConversationId,
+    leadStatus,
+    aiEnabled,
+    notes,
+    phone,
+    courseInterest,
+    currentIntent,
+    currentStage,
+    lastQuestionAsked,
+    sessionMemory,
+    tags,
+    saleAgent
+  ]);
   return getById(result.insertId);
 }
 
@@ -51,6 +85,10 @@ async function updateLead(id, updates) {
     else if (key === 'leadStatus') columnName = 'lead_status';
     else if (key === 'aiEnabled') columnName = 'ai_enabled';
     else if (key === 'courseInterest') columnName = 'course_interest';
+    else if (key === 'currentIntent') columnName = 'current_intent';
+    else if (key === 'currentStage') columnName = 'current_stage';
+    else if (key === 'lastQuestionAsked') columnName = 'last_question_asked';
+    else if (key === 'sessionMemory') columnName = 'session_memory';
     else if (key === 'lastMessageSender') columnName = 'last_message_sender';
     else if (key === 'lastMessageAt') columnName = 'last_message_at';
     else if (key === 'followUpSent') columnName = 'follow_up_sent';

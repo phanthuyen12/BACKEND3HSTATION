@@ -37,8 +37,22 @@ async function listChatHistory(pageId, facebookUserId, { limit = 100, offset = 0
   return rows.map(mapRow);
 }
 
+async function listRecentChatHistory(pageId, facebookUserId, { limit = 6 } = {}) {
+  const sql = `SELECT * FROM (
+      SELECT *
+      FROM facebook_chat_logs
+      WHERE page_id = ? AND facebook_user_id = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT ?
+    ) recent_logs
+    ORDER BY created_at ASC, id ASC`;
+  const rows = await query(sql, [pageId, facebookUserId, Number(limit)]);
+  return rows.map(mapRow);
+}
+
 module.exports = {
   createLog,
   getById,
   listChatHistory,
+  listRecentChatHistory,
 };
