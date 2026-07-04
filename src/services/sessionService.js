@@ -65,6 +65,9 @@ const registerSocket = (userId, sessionId, socket) => {
   userSockets.set(normalizedUserId, sockets);
 
   socket.on('error', (err) => {
+    if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {
+      return; // Bỏ qua lỗi ngắt kết nối thông thường từ client để tránh rác log
+    }
     console.warn(`[Socket Error] User ${normalizedUserId} socket error:`, err.message);
   });
 

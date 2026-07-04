@@ -52,6 +52,16 @@ const getRankSummary = asyncHandler(async (req, res) => {
   return successResponse(res, { data });
 });
 
+const updateVideoProgress = asyncHandler(async (req, res) => {
+  const data = await elearningService.updateVideoProgress(
+    req.user.id,
+    req.params.courseId,
+    req.params.videoId,
+    req.body
+  );
+  return successResponse(res, { data }, 'Cập nhật tiến độ video thành công');
+});
+
 module.exports = {
   listCourses,
   getCourseById,
@@ -59,9 +69,9 @@ module.exports = {
   enrollCourse,
   checkEnrollment,
   getDashboard,
-  getRankSummary
+  getRankSummary,
+  updateVideoProgress
 };
-
 
 
 

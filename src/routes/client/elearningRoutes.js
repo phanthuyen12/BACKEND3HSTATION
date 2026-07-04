@@ -58,6 +58,26 @@ router.post(
   elearningController.enrollCourse
 );
 
+router.post(
+  '/courses/:courseId/videos/:videoId/progress',
+  authenticate,
+  validate({
+    params: Joi.object({
+      courseId: Joi.number().integer().positive().required(),
+      videoId: Joi.number().integer().positive().required()
+    }),
+    body: Joi.object({
+      watchedSeconds: Joi.number().min(0).optional(),
+      durationSeconds: Joi.number().min(0).optional(),
+      lastPositionSeconds: Joi.number().min(0).optional(),
+      progressPercent: Joi.number().min(0).max(100).optional(),
+      completed: Joi.boolean().optional()
+    })
+      .or('watchedSeconds', 'durationSeconds', 'lastPositionSeconds', 'progressPercent', 'completed')
+  }),
+  elearningController.updateVideoProgress
+);
+
 router.get('/me/dashboard', authenticate, elearningController.getDashboard);
 router.get('/me/rank', authenticate, elearningController.getRankSummary);
 
@@ -68,7 +88,6 @@ router.get(
 );
 
 module.exports = router;
-
 
 
 

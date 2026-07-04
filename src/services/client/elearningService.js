@@ -8,6 +8,8 @@ const userModel = require('../../models/userModel');
 const courseSectionModel = require('../../models/courseSectionModel');
 const courseLessonModel = require('../../models/courseLessonModel');
 const courseProgressModel = require('../../models/courseProgressModel');
+const videoModel = require('../../models/videoModel');
+const userCourseService = require('../userCourseService');
 const { buildPagination } = require('../../utils/pagination');
 
 const getUserRankId = (user) => {
@@ -79,6 +81,48 @@ const canAccessCourse = async ({ course, user }) => {
     rankId,
     courseId: course.id
   });
+};
+
+const clampProgressNumber = (value, { min = 0, max = null } = {}) => {
+  const numericValue = Number(value || 0);
+  if (Number.isNaN(numericValue)) return min;
+  const boundedMin = Math.max(min, numericValue);
+  return max === null ? boundedMin : Math.min(max, boundedMin);
+};
+
+const formatRankSummary = (rank) => (
+  rank
+    ? {
+      id: String(rank.id),
+      code: rank.code,
+      name: rank.name,
+      description: rank.description,
+      status: rank.status
+    }
+    : null
+);
+
+const buildCourseProgressPayload = (course, progress = null) => {
+  const totalLessons = Number(progress?.total_lessons || 0);
+  const completedLessons = Number(progress?.completed_lessons || 0);
+  const completionPercent = Number(progress?.completion_percent || 0);
+
+  return {
+    id: String(course.id || course.course_id),
+    courseId: String(course.id || course.course_id),
+    title: course.title,
+    thumbnail: course.thumbnail_url || course.thumbnail || '',
+    price: String(course.price || 0),
+    category: course.category_name || course.category || '',
+    progress: completionPercent,
+    completionPercent,
+    totalLessons,
+    completedLessons,
+    remainingLessons: Math.max(totalLessons - completedLessons, 0),
+    completedAt: progress?.last_completed_at || null,
+    lastWatchedAt: progress?.last_watched_at || null,
+    updatedAt: progress?.last_progress_at || course.updated_at || course.created_at || null
+  };
 };
 
 const listCourses = async ({ page, limit, search, category, user = null }) => {
@@ -192,6 +236,8 @@ const enrollCourse = async (userId, courseId) => {
     throw ApiError.forbidden('Rank hiện tại chưa được cấp quyền học khóa này');
   }
 
+  await userCourseService.syncRankCoursesForUser(user.id);
+
   const existingEnrollment = await userCourseModel.userHasActiveCourse(parseInt(userId, 10), parseInt(courseId, 10));
   if (existingEnrollment) {
     return {
@@ -290,52 +336,156 @@ const getStudentDashboard = async (userId) => {
     throw ApiError.notFound('User not found');
   }
 
+  await userCourseService.syncRankCoursesForUser(user.id);
+
   const rank = user.rank_id ? await rankModel.getRankById(user.rank_id) : null;
   const accessibleCourses = user.role === 'admin' || user.role === 'super_admin'
     ? await courseModel.listCourses({ limit: 1000, offset: 0 })
     : await courseModel.listAccessibleCourses({ user, limit: 1000, offset: 0 });
-  const enrolledCourses = await userCourseModel.listUserCourses(user.id);
-  const progressRows = await courseProgressModel.getUserCourseProgress(user.id);
+  const enrolledCourses = await userCourseService.listUserCourses(user.id);
+  const accessibleCourseIds = accessibleCourses.map((course) => Number(course.id)).filter(Boolean);
+  const progressRows = await courseProgressModel.getUserCourseProgress(user.id, accessibleCourseIds);
+  const progressMap = new Map(progressRows.map((row) => [String(row.course_id), row]));
+  const accessibleCourseCards = accessibleCourses.map((course) =>
+    buildCourseProgressPayload(course, progressMap.get(String(course.id)))
+  );
+  const enrolledCourseCards = enrolledCourses.map((course) =>
+    buildCourseProgressPayload(
+      {
+        id: course.course_id,
+        title: course.title,
+        thumbnail_url: course.thumbnail_url,
+        price: course.price,
+        category_name: course.category_name || course.category || ''
+      },
+      progressMap.get(String(course.course_id))
+    )
+  );
+  const completedCourses = enrolledCourseCards.filter((course) => course.totalLessons > 0 && course.completedLessons >= course.totalLessons);
+  const inProgressCourses = enrolledCourseCards.filter((course) => course.completedLessons > 0 && course.completedLessons < course.totalLessons);
+  const averageProgress = enrolledCourseCards.length
+    ? Math.round(
+      enrolledCourseCards.reduce((sum, course) => sum + Number(course.progress || 0), 0) / enrolledCourseCards.length
+    )
+    : 0;
+  const continueLearning = [...enrolledCourseCards]
+    .filter((course) => course.progress > 0 && course.progress < 100)
+    .sort((left, right) => new Date(right.lastWatchedAt || right.updatedAt || 0).getTime() - new Date(left.lastWatchedAt || left.updatedAt || 0).getTime());
+  const recommendedCourses = accessibleCourseCards
+    .filter((course) => course.progress < 100)
+    .sort((left, right) => Number(left.progress || 0) - Number(right.progress || 0));
+  const recentEnrolled = [...enrolledCourseCards]
+    .sort((left, right) => new Date(right.updatedAt || 0).getTime() - new Date(left.updatedAt || 0).getTime());
 
   return {
     account: {
       id: String(user.id),
       name: user.name,
       email: user.email,
-      rank: rank
-        ? {
-          id: String(rank.id),
-          code: rank.code,
-          name: rank.name,
-          description: rank.description,
-          status: rank.status
-        }
-        : null
+      rank: formatRankSummary(rank)
     },
     stats: {
       allowedCourses: accessibleCourses.length,
-      inProgressCourses: enrolledCourses.length,
-      completedCourses: progressRows.filter((row) => Number(row.total_lessons || 0) > 0 && Number(row.completed_lessons || 0) >= Number(row.total_lessons || 0)).length,
-      progressRate: accessibleCourses.length ? Math.min(100, Math.round((progressRows.filter((row) => Number(row.total_lessons || 0) > 0 && Number(row.completed_lessons || 0) >= Number(row.total_lessons || 0)).length / accessibleCourses.length) * 100)) : 0
+      registeredCourses: enrolledCourseCards.length,
+      inProgressCourses: inProgressCourses.length,
+      completedCourses: completedCourses.length,
+      progressRate: averageProgress,
+      averageProgress
     },
-    accessibleCourses: accessibleCourses.slice(0, 6).map((course) => ({
-      id: String(course.id),
-      title: course.title,
-      thumbnail: course.thumbnail_url || '',
-      price: String(course.price || 0),
-      category: course.category_name || ''
-    })),
-    enrolledCourses,
+    accessibleCourses: accessibleCourseCards,
+    enrolledCourses: enrolledCourseCards,
     progress: progressRows,
-    rankSummary: rank
-      ? {
-        id: String(rank.id),
-        code: rank.code,
-        name: rank.name,
-        description: rank.description,
-        status: rank.status
-      }
-      : null
+    continueLearning,
+    recommendedCourses,
+    recentEnrolled,
+    rankSummary: formatRankSummary(rank)
+  };
+};
+
+const updateVideoProgress = async (userId, courseId, videoId, payload = {}) => {
+  const parsedCourseId = parseInt(courseId, 10);
+  const parsedVideoId = parseInt(videoId, 10);
+
+  const [user, course, video] = await Promise.all([
+    userModel.getUserById(parseInt(userId, 10)),
+    courseModel.getCourseById(parsedCourseId),
+    videoModel.getVideoById(parsedVideoId)
+  ]);
+
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+
+  if (!course || course.status !== 'active') {
+    throw ApiError.notFound('Course not found');
+  }
+
+  if (!video || Number(video.course_id) !== parsedCourseId) {
+    throw ApiError.notFound('Video not found');
+  }
+
+  const hasAccess = await canAccessCourse({ course, user });
+  if (!hasAccess) {
+    throw ApiError.forbidden('Bạn chưa có quyền truy cập video này');
+  }
+
+  await userCourseService.syncRankCoursesForUser(user.id);
+
+  const existingProgress = await courseProgressModel.getProgressByVideo({
+    userId: parseInt(userId, 10),
+    courseId: parsedCourseId,
+    videoId: parsedVideoId
+  });
+
+  const videoDuration = clampProgressNumber(payload.durationSeconds || video.duration || existingProgress?.duration_seconds || 0, { min: 0 });
+  const watchedSeconds = clampProgressNumber(
+    Math.max(
+      Number(payload.watchedSeconds || 0),
+      Number(existingProgress?.watched_seconds || 0)
+    ),
+    { min: 0, max: videoDuration > 0 ? videoDuration : null }
+  );
+  const lastPositionSeconds = clampProgressNumber(
+    payload.lastPositionSeconds !== undefined ? payload.lastPositionSeconds : watchedSeconds,
+    { min: 0, max: videoDuration > 0 ? videoDuration : null }
+  );
+  const rawProgressPercent = videoDuration > 0
+    ? (watchedSeconds / videoDuration) * 100
+    : Number(payload.progressPercent || existingProgress?.progress_percent || 0);
+  const progressPercent = clampProgressNumber(Math.max(rawProgressPercent, Number(existingProgress?.progress_percent || 0)), { min: 0, max: 100 });
+  const completed = Boolean(payload.completed) || progressPercent >= courseProgressModel.VIDEO_COMPLETION_THRESHOLD;
+
+  const progress = await courseProgressModel.upsertVideoProgress({
+    userId: parseInt(userId, 10),
+    courseId: parsedCourseId,
+    videoId: parsedVideoId,
+    watchedSeconds,
+    durationSeconds: videoDuration,
+    lastPositionSeconds,
+    progressPercent,
+    completed
+  });
+
+  const [courseSummary] = await courseProgressModel.getCourseProgressSummaries(user.id, { courseIds: [parsedCourseId] });
+
+  return {
+    progress: {
+      videoId: String(parsedVideoId),
+      courseId: String(parsedCourseId),
+      watchedSeconds: Number(progress?.watched_seconds || 0),
+      durationSeconds: Number(progress?.duration_seconds || 0),
+      lastPositionSeconds: Number(progress?.last_position_seconds || 0),
+      progressPercent: Number(progress?.progress_percent || 0),
+      completed: Boolean(progress?.completed),
+      completedAt: progress?.completed_at || null,
+      lastWatchedAt: progress?.last_watched_at || null
+    },
+    courseProgress: {
+      courseId: String(parsedCourseId),
+      totalLessons: Number(courseSummary?.total_lessons || 0),
+      completedLessons: Number(courseSummary?.completed_lessons || 0),
+      completionPercent: Number(courseSummary?.completion_percent || 0)
+    }
   };
 };
 
@@ -346,5 +496,6 @@ module.exports = {
   enrollCourse,
   checkEnrollment,
   getRankSummaryForUser,
-  getStudentDashboard
+  getStudentDashboard,
+  updateVideoProgress
 };
