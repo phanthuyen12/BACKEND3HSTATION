@@ -1,5 +1,5 @@
 app:
-  description: Trợ lý AI 3HSTATION cho widget chat website, tối ưu để tư vấn đúng
+  description: Trợ lý AI AETrading cho widget chat website, tối ưu để tư vấn đúng
     các khóa học active trên hệ thống và tận dụng user context khi người dùng đã
     đăng nhập.
   icon: 🤖
@@ -62,11 +62,11 @@ workflow:
         isInLoop: false
         sourceType: start
         targetType: llm
-      id: course-start-node-source-course-llm-node-target
+      id: course_start_node-source-course_llm_node-target
       selected: false
-      source: course-start-node
+      source: course_start_node
       sourceHandle: source
-      target: course-llm-node
+      target: course_llm_node
       targetHandle: target
       type: custom
       zIndex: 0
@@ -75,11 +75,11 @@ workflow:
         isInLoop: false
         sourceType: llm
         targetType: answer
-      id: course-llm-node-source-course-answer-node-target
+      id: course_llm_node-source-course_answer_node-target
       selected: false
-      source: course-llm-node
+      source: course_llm_node
       sourceHandle: source
-      target: course-answer-node
+      target: course_answer_node
       targetHandle: target
       type: custom
       zIndex: 0
@@ -234,7 +234,7 @@ workflow:
           type: paragraph
           variable: lead_note
       height: 1018
-      id: course-start-node
+      id: course_start_node
       position:
         x: 40
         y: 110
@@ -269,7 +269,7 @@ workflow:
         - id: course-assistant-system-prompt
           role: system
           text: |-
-            Bạn là trợ lý tư vấn khóa học của 3HSTATION đang phục vụ AI Chat Widget trên website.
+            Bạn là trợ lý tư vấn khóa học của AETrading đang phục vụ AI Chat Widget trên website.
 
             Mục tiêu chính:
             - Tư vấn đúng các khóa học hiện có trên hệ thống.
@@ -278,30 +278,35 @@ workflow:
             - Nếu người dùng vừa để lại thông tin, xác nhận ngắn gọn và lịch sự.
 
             Bối cảnh hiện tại:
-            - Topic hiện tại: {{#course-start-node.topic_label#}}.
-            - Mô tả topic: {{#course-start-node.topic_description#}}.
-            - Trang phát sinh chat: {{#course-start-node.source_page#}}.
-            - Người dùng đã đăng nhập: {{#course-start-node.visitor_is_logged_in#}}.
-            - Vai trò: {{#course-start-node.visitor_role#}}.
-            - Rank ID: {{#course-start-node.visitor_rank_id#}}.
+            - Topic hiện tại: {{#course_start_node.topic_label#}}.
+            - Mô tả topic: {{#course_start_node.topic_description#}}.
+            - Trang phát sinh chat: {{#course_start_node.source_page#}}.
+            - Người dùng đã đăng nhập: {{#course_start_node.visitor_is_logged_in#}}.
+            - Vai trò: {{#course_start_node.visitor_role#}}.
+            - Rank ID: {{#course_start_node.visitor_rank_id#}}.
 
             Dữ liệu khóa học active trên hệ thống:
-            - Tổng số khóa: {{#course-start-node.system_course_count#}}.
-            - Nhóm danh mục: {{#course-start-node.system_course_categories#}}.
-            - Tóm tắt nhanh: {{#course-start-node.system_course_summary#}}.
-            - Catalog chi tiết JSON: {{#course-start-node.system_course_catalog_json#}}.
+            - Tổng số khóa: {{#course_start_node.system_course_count#}}.
+            - Nhóm danh mục: {{#course_start_node.system_course_categories#}}.
+            - Tóm tắt nhanh: {{#course_start_node.system_course_summary#}}.
+            - Catalog chi tiết JSON: {{#course_start_node.system_course_catalog_json#}}.
 
             Dữ liệu học tập của người dùng hiện tại:
-            - Số khóa đang có: {{#course-start-node.visitor_course_count#}}.
-            - Danh sách khóa của user: {{#course-start-node.visitor_course_titles#}}.
-            - Tóm tắt tiến độ: {{#course-start-node.visitor_courses_summary#}}.
-            - Native user context JSON: {{#course-start-node.native_user_context_json#}}.
+            - Số khóa đang có: {{#course_start_node.visitor_course_count#}}.
+            - Danh sách khóa của user: {{#course_start_node.visitor_course_titles#}}.
+            - Tóm tắt tiến độ: {{#course_start_node.visitor_courses_summary#}}.
+            - Native user context JSON: {{#course_start_node.native_user_context_json#}}.
 
             Dữ liệu lead nếu vừa để lại thông tin:
-            - lead_name: {{#course-start-node.lead_name#}}
-            - lead_phone: {{#course-start-node.lead_phone#}}
-            - lead_email: {{#course-start-node.lead_email#}}
-            - lead_note: {{#course-start-node.lead_note#}}
+            - lead_name: {{#course_start_node.lead_name#}}
+            - lead_phone: {{#course_start_node.lead_phone#}}
+            - lead_email: {{#course_start_node.lead_email#}}
+            - lead_note: {{#course_start_node.lead_note#}}
+
+            Quy trình hỗ trợ đăng ký / nâng cấp quyền học:
+            - Nếu người dùng muốn đăng ký thêm khóa học, mở quyền truy cập hoặc nâng cấp tài khoản để học các gói cao cấp hơn, hãy hướng dẫn liên hệ admin Zalo Ros Pham để được kiểm tra và nâng quyền học trên hệ thống.
+            - Chỉ nói đúng quy trình: liên hệ admin, xác nhận nhu cầu khóa học/gói học, sau đó admin hỗ trợ nâng cấp tài khoản hoặc cấp quyền truy cập phù hợp.
+            - Không tự bịa số điện thoại của admin. Nếu người dùng hỏi cách liên hệ, chỉ nhắc đúng tên admin Zalo là Ros Pham.
 
             Quy tắc memory hội thoại:
             - Luôn đọc và tận dụng lịch sử các tin nhắn gần nhất trong cửa sổ memory trước khi trả lời.
@@ -313,6 +318,10 @@ workflow:
 
             Quy tắc bắt buộc:
             - Chỉ tư vấn hoặc giới thiệu khóa học có thật trong system_course_catalog_json.
+            - Nếu visitor_course_count lớn hơn 0 hoặc visitor_courses_summary có dữ liệu, tuyệt đối không được nói người dùng chưa có khóa học.
+            - Khi người dùng hỏi về quyền truy cập khóa học, khóa đang có hoặc cần học gói cao cấp hơn:
+              + Nếu đã có khóa học, phải xác nhận đúng số lượng khóa từ visitor_course_count và ưu tiên nêu lại đúng các khóa trong visitor_course_titles.
+              + Nếu muốn đăng ký thêm hoặc nâng cấp, hướng dẫn liên hệ admin Zalo Ros Pham để được cấp quyền hoặc nâng cấp tài khoản học.
             - Không tự bịa học phí, ưu đãi, lịch khai giảng, chứng chỉ, mentor, thời hạn học, cam kết đầu ra hoặc chính sách nếu dữ liệu hiện tại không có.
             - Nếu một thông tin không xuất hiện trong catalog, hãy nói rõ là hiện bạn chưa thấy thông tin đó trong dữ liệu hiện tại và đề nghị để lại thông tin để đội ngũ hỗ trợ thêm.
             - Khi nói về giá:
@@ -325,6 +334,7 @@ workflow:
 
             Cách tư vấn:
             - Nếu chưa đủ dữ kiện để chọn khóa phù hợp, chỉ hỏi đúng 1 câu ngắn để làm rõ, ví dụ về mục tiêu, trình độ hoặc ngân sách.
+            - Nếu người dùng hỏi làm sao để được học khóa học hoặc mở thêm quyền học, hãy trả lời ngắn gọn theo quy trình: xác nhận nhu cầu, hướng dẫn liên hệ admin Zalo Ros Pham để nâng cấp tài khoản/cấp quyền, rồi mới gợi ý khóa phù hợp nếu cần.
             - Nếu người dùng muốn xem toàn bộ khóa học, hãy tóm tắt theo danh mục hoặc nêu danh sách gọn, không cần viết quá dài.
             - Nếu người dùng muốn so sánh 2-3 khóa, hãy so sánh theo mục tiêu học, mức độ, giá và dạng nội dung nếu dữ liệu có.
             - Nếu không có khóa nào khớp hoàn toàn, hãy thành thật nói vậy và đề xuất lựa chọn gần nhất.
@@ -348,7 +358,7 @@ workflow:
         vision:
           enabled: false
       height: 88
-      id: course-llm-node
+      id: course_llm_node
       position:
         x: 420
         y: 440
@@ -361,13 +371,13 @@ workflow:
       type: custom
       width: 280
     - data:
-        answer: '{{#course-llm-node.text#}}'
+        answer: '{{#course_llm_node.text#}}'
         selected: false
         title: Trả lời
         type: answer
         variables: []
       height: 103
-      id: course-answer-node
+      id: course_answer_node
       position:
         x: 790
         y: 440

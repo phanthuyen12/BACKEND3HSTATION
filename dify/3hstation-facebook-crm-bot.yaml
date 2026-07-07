@@ -1,9 +1,9 @@
 app:
-  description: "3HSTATION Facebook CRM Bot"
+  description: "AETrading Facebook CRM Bot"
   icon: "🤖"
   icon_background: "#FFEAD5"
   mode: "chat"
-  name: "3HSTATION Facebook CRM Bot"
+  name: "AETrading Facebook CRM Bot"
   use_icon_as_answer_icon: false
 kind: app
 version: 0.1.1

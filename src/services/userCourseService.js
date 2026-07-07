@@ -6,7 +6,12 @@ const courseProgressModel = require('../models/courseProgressModel');
 const { isPrivilegedRole } = require('../utils/roles');
 
 const syncRankCoursesForUser = async (userId) => {
-  const user = await userModel.getUserById(parseInt(userId, 10));
+  const normalizedUserId = parseInt(userId, 10);
+  if (!Number.isInteger(normalizedUserId) || normalizedUserId <= 0) {
+    return [];
+  }
+
+  const user = await userModel.getUserById(normalizedUserId);
   if (!user || isPrivilegedRole(user.role) || !user.rank_id) {
     return [];
   }
@@ -17,14 +22,18 @@ const syncRankCoursesForUser = async (userId) => {
   }
 
   return userCourseModel.grantManyCourses({
-    userId: parseInt(userId, 10),
+    userId: normalizedUserId,
     courseIds: allowedCourseIds,
     status: 'active'
   });
 };
 
 const listUserCourses = async (userId) => {
-  await syncRankCoursesForUser(userId);
+  try {
+    await syncRankCoursesForUser(userId);
+  } catch (error) {
+    console.warn(`[UserCourse] Không thể đồng bộ khóa học theo rank cho user ${userId}: ${error.message}`);
+  }
 
   const rows = await userCourseModel.listUserCourses(userId);
   const courseIds = rows.map((row) => Number(row.course_id)).filter(Boolean);
@@ -76,7 +85,6 @@ module.exports = {
   grantCourse,
   revokeCourse
 };
-
 
 
 
