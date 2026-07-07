@@ -30,6 +30,42 @@ const normalizeDifyInputs = (inputs = {}) => {
   );
 };
 
+const looksLikeDifyTemplate = (value) => {
+  const text = String(value || '').trim();
+  return /^\{\{#.+#\}\}$/.test(text);
+};
+
+const pickFirstUsableAnswer = (...values) => {
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    const text = value.trim();
+    if (!text || looksLikeDifyTemplate(text)) continue;
+    return text;
+  }
+
+  return '';
+};
+
+const extractDifyAnswer = (data) => {
+  const answer = pickFirstUsableAnswer(
+    data?.answer,
+    data?.outputs?.text,
+    data?.outputs?.answer,
+    data?.data?.outputs?.text,
+    data?.data?.outputs?.answer,
+    data?.workflow_run?.outputs?.text,
+    data?.workflow_run?.outputs?.answer,
+    data?.metadata?.outputs?.text,
+    data?.metadata?.outputs?.answer
+  );
+
+  if (answer) {
+    return answer;
+  }
+
+  return typeof data?.answer === 'string' ? data.answer.trim() : '';
+};
+
 async function sendChatMessageWithConfig({
   query,
   user,
@@ -92,8 +128,23 @@ async function sendChatMessageWithConfig({
       throw new Error(data.message || data.error || `Dify API error: ${response.status}`);
     }
 
+    let resolvedAnswer = extractDifyAnswer(data);
+    if (looksLikeDifyTemplate(resolvedAnswer)) {
+      console.warn('[Dify] Answer vẫn là placeholder template, cần kiểm tra publish workflow/app trên Dify server.', {
+        answer: resolvedAnswer,
+        conversationId: data?.conversation_id || null,
+        topLevelKeys: Object.keys(data || {}),
+        workflowOutputKeys: Object.keys(data?.workflow_run?.outputs || {}),
+        metadataOutputKeys: Object.keys(data?.metadata?.outputs || {})
+      });
+    }
+
+    if (!resolvedAnswer || looksLikeDifyTemplate(resolvedAnswer)) {
+      resolvedAnswer = 'Mình chưa lấy được nội dung trả lời phù hợp từ hệ thống lúc này. Bạn thử nhắn lại giúp mình một lần nữa nhé.';
+    }
+
     return {
-      answer: data.answer,
+      answer: resolvedAnswer,
       conversationId: data.conversation_id
     };
   } catch (error) {
