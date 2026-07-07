@@ -27,10 +27,27 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, '../public')));
 
-app.use(cors({
+const allowedOrigins = new Set([
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:4173',
+  'http://127.0.0.1:4173',
+  'https://api.aetrading.vn',
+  'http://127.0.0.1:3000',
+  'https://academy.aetrading.vn',
+  'https://aetrading.vn',
+]);
 
-  origin: 'https://academy.aetrading.vn', // frontend URL
-  credentials: true, // nếu dùng cookie
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true,
 }));
 app.get('/health', (_req, res) => {
   res.json({
@@ -50,7 +67,6 @@ app.use(notFound);
 app.use(errorHandler);
 
 module.exports = app;
-
 
 
 

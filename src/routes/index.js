@@ -55,6 +55,7 @@ const clientToolKeyRoutes = require('./client/toolKeyRoutes');
 
 const dashboardRoutes = require('./dashboardRoutes');
 const supportRoutes = require('./supportRoutes');
+const webChatRoutes = require('./webChatRoutes');
 
 const router = express.Router();
 const adminFacebookRoutes = require('./adminFacebookRoutes');
@@ -88,6 +89,7 @@ router.use('/banks', bankRoutes);
 router.use('/documents', documentRoutes);
 router.use('/configs', configRoutes);
 router.use('/support', supportRoutes);
+router.use('/web-chat', webChatRoutes);
 router.use('/admin/tool-packages', toolPackagesRoutes); 
 
 // Client APIs
@@ -112,6 +114,5 @@ router.use('/admin/mock-data', mockDataRoutes);
 router.use('/admin/facebook', adminFacebookRoutes);
 router.use('/facebook/webhook', facebookWebhookRoutes);
 module.exports = router;
-
 
 

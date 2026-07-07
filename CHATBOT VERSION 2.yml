@@ -1,0 +1,386 @@
+app:
+  description: Trợ lý AI 3HSTATION cho widget chat website, tối ưu để tư vấn đúng
+    các khóa học active trên hệ thống và tận dụng user context khi người dùng đã
+    đăng nhập.
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: advanced-chat
+  name: CHATBOT VERSION 2
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/openrouter:0.0.54@fea0bb6f5208e9c654bd8114c93582760994a7406355512c3381bd8b723498b7
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: course-start-node-source-course-llm-node-target
+      selected: false
+      source: course-start-node
+      sourceHandle: source
+      target: course-llm-node
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: answer
+      id: course-llm-node-source-course-answer-node-target
+      selected: false
+      source: course-llm-node
+      sourceHandle: source
+      target: course-answer-node
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: Bắt đầu
+        type: start
+        variables:
+        - label: topic_id
+          max_length: 120
+          options: []
+          required: false
+          type: text-input
+          variable: topic_id
+        - label: topic_label
+          max_length: 180
+          options: []
+          required: false
+          type: text-input
+          variable: topic_label
+        - label: topic_description
+          max_length: 500
+          options: []
+          required: false
+          type: paragraph
+          variable: topic_description
+        - label: source_page
+          max_length: 255
+          options: []
+          required: false
+          type: text-input
+          variable: source_page
+        - label: visitor_name
+          max_length: 120
+          options: []
+          required: false
+          type: text-input
+          variable: visitor_name
+        - label: visitor_phone
+          max_length: 50
+          options: []
+          required: false
+          type: text-input
+          variable: visitor_phone
+        - label: visitor_email
+          max_length: 180
+          options: []
+          required: false
+          type: text-input
+          variable: visitor_email
+        - label: visitor_user_id
+          max_length: 80
+          options: []
+          required: false
+          type: text-input
+          variable: visitor_user_id
+        - label: visitor_is_logged_in
+          max_length: 10
+          options: []
+          required: false
+          type: text-input
+          variable: visitor_is_logged_in
+        - label: visitor_role
+          max_length: 80
+          options: []
+          required: false
+          type: text-input
+          variable: visitor_role
+        - label: visitor_rank_id
+          max_length: 80
+          options: []
+          required: false
+          type: text-input
+          variable: visitor_rank_id
+        - label: visitor_course_count
+          max_length: 20
+          options: []
+          required: false
+          type: text-input
+          variable: visitor_course_count
+        - label: visitor_course_titles
+          max_length: 3000
+          options: []
+          required: false
+          type: paragraph
+          variable: visitor_course_titles
+        - label: visitor_courses_summary
+          max_length: 6000
+          options: []
+          required: false
+          type: paragraph
+          variable: visitor_courses_summary
+        - label: native_user_context_json
+          max_length: 20000
+          options: []
+          required: false
+          type: paragraph
+          variable: native_user_context_json
+        - label: system_course_count
+          max_length: 20
+          options: []
+          required: false
+          type: text-input
+          variable: system_course_count
+        - label: system_course_categories
+          max_length: 3000
+          options: []
+          required: false
+          type: paragraph
+          variable: system_course_categories
+        - label: system_course_titles
+          max_length: 6000
+          options: []
+          required: false
+          type: paragraph
+          variable: system_course_titles
+        - label: system_course_summary
+          max_length: 12000
+          options: []
+          required: false
+          type: paragraph
+          variable: system_course_summary
+        - label: system_course_catalog_json
+          max_length: 40000
+          options: []
+          required: false
+          type: paragraph
+          variable: system_course_catalog_json
+        - label: lead_name
+          max_length: 120
+          options: []
+          required: false
+          type: text-input
+          variable: lead_name
+        - label: lead_phone
+          max_length: 50
+          options: []
+          required: false
+          type: text-input
+          variable: lead_phone
+        - label: lead_email
+          max_length: 180
+          options: []
+          required: false
+          type: text-input
+          variable: lead_email
+        - label: lead_note
+          max_length: 1000
+          options: []
+          required: false
+          type: paragraph
+          variable: lead_note
+      height: 1018
+      id: course-start-node
+      position:
+        x: 40
+        y: 110
+      positionAbsolute:
+        x: 40
+        y: 110
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 280
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 16
+        model:
+          completion_params:
+            exclude_reasoning_tokens: true
+            temperature: 0.2
+          mode: chat
+          name: google/gemini-3-flash-preview
+          provider: langgenius/openrouter/openrouter
+        prompt_template:
+        - id: course-assistant-system-prompt
+          role: system
+          text: |-
+            Bạn là trợ lý tư vấn khóa học của 3HSTATION đang phục vụ AI Chat Widget trên website.
+
+            Mục tiêu chính:
+            - Tư vấn đúng các khóa học hiện có trên hệ thống.
+            - Giúp người dùng chọn khóa phù hợp theo mục tiêu, trình độ và ngân sách.
+            - Nếu người dùng đã đăng nhập, tận dụng tiến độ học hiện tại để gợi ý bước tiếp theo.
+            - Nếu người dùng vừa để lại thông tin, xác nhận ngắn gọn và lịch sự.
+
+            Bối cảnh hiện tại:
+            - Topic hiện tại: {{#course-start-node.topic_label#}}.
+            - Mô tả topic: {{#course-start-node.topic_description#}}.
+            - Trang phát sinh chat: {{#course-start-node.source_page#}}.
+            - Người dùng đã đăng nhập: {{#course-start-node.visitor_is_logged_in#}}.
+            - Vai trò: {{#course-start-node.visitor_role#}}.
+            - Rank ID: {{#course-start-node.visitor_rank_id#}}.
+
+            Dữ liệu khóa học active trên hệ thống:
+            - Tổng số khóa: {{#course-start-node.system_course_count#}}.
+            - Nhóm danh mục: {{#course-start-node.system_course_categories#}}.
+            - Tóm tắt nhanh: {{#course-start-node.system_course_summary#}}.
+            - Catalog chi tiết JSON: {{#course-start-node.system_course_catalog_json#}}.
+
+            Dữ liệu học tập của người dùng hiện tại:
+            - Số khóa đang có: {{#course-start-node.visitor_course_count#}}.
+            - Danh sách khóa của user: {{#course-start-node.visitor_course_titles#}}.
+            - Tóm tắt tiến độ: {{#course-start-node.visitor_courses_summary#}}.
+            - Native user context JSON: {{#course-start-node.native_user_context_json#}}.
+
+            Dữ liệu lead nếu vừa để lại thông tin:
+            - lead_name: {{#course-start-node.lead_name#}}
+            - lead_phone: {{#course-start-node.lead_phone#}}
+            - lead_email: {{#course-start-node.lead_email#}}
+            - lead_note: {{#course-start-node.lead_note#}}
+
+            Quy tắc memory hội thoại:
+            - Luôn đọc và tận dụng lịch sử các tin nhắn gần nhất trong cửa sổ memory trước khi trả lời.
+            - Nếu người dùng nhắn ngắn như "có", "ok", "rồi", "gửi mình", "khóa nào", "bao nhiêu", "tiếp đi", hãy hiểu đó là câu nối tiếp theo đúng ngữ cảnh gần nhất.
+            - Nếu ở các lượt trước bạn đã đề xuất hoặc đang so sánh một vài khóa học, hãy tiếp tục bám đúng các khóa đó thay vì bắt đầu lại từ đầu.
+            - Nếu người dùng đã cung cấp mục tiêu, trình độ, ngân sách hoặc khóa đang quan tâm ở các tin nhắn trước, không hỏi lại trừ khi thật sự thiếu dữ liệu.
+            - Nếu người dùng đổi chủ đề rõ ràng, hãy chuyển sang chủ đề mới nhưng vẫn giữ các thông tin hữu ích đã biết về họ.
+            - Nếu có xung đột giữa lịch sử chat và topic mặc định, ưu tiên lịch sử chat gần nhất của người dùng.
+
+            Quy tắc bắt buộc:
+            - Chỉ tư vấn hoặc giới thiệu khóa học có thật trong system_course_catalog_json.
+            - Không tự bịa học phí, ưu đãi, lịch khai giảng, chứng chỉ, mentor, thời hạn học, cam kết đầu ra hoặc chính sách nếu dữ liệu hiện tại không có.
+            - Nếu một thông tin không xuất hiện trong catalog, hãy nói rõ là hiện bạn chưa thấy thông tin đó trong dữ liệu hiện tại và đề nghị để lại thông tin để đội ngũ hỗ trợ thêm.
+            - Khi nói về giá:
+              + Nếu isFree là true hoặc price bằng 0, gọi là "miễn phí".
+              + Nếu có price > 0, dùng đúng mức giá trong catalog.
+            - Khi người dùng hỏi "khóa nào phù hợp", chỉ đề xuất tối đa 3 khóa và nêu ngắn gọn lý do phù hợp cho từng khóa.
+            - Nếu người dùng hỏi về khóa họ đang học hoặc nên học tiếp gì, ưu tiên dùng native_user_context_json và visitor_courses_summary.
+            - Nếu tin nhắn hiện tại là xác nhận lead hoặc có lead_name/lead_phone, hãy ưu tiên phản hồi rất ngắn: xác nhận đã ghi nhận thông tin và đội ngũ sẽ liên hệ sớm. Không hỏi lan man thêm.
+            - Topic hiện tại chỉ là ngữ cảnh ưu tiên ban đầu; nếu người dùng đổi chủ đề rõ ràng thì bám theo chủ đề mới.
+
+            Cách tư vấn:
+            - Nếu chưa đủ dữ kiện để chọn khóa phù hợp, chỉ hỏi đúng 1 câu ngắn để làm rõ, ví dụ về mục tiêu, trình độ hoặc ngân sách.
+            - Nếu người dùng muốn xem toàn bộ khóa học, hãy tóm tắt theo danh mục hoặc nêu danh sách gọn, không cần viết quá dài.
+            - Nếu người dùng muốn so sánh 2-3 khóa, hãy so sánh theo mục tiêu học, mức độ, giá và dạng nội dung nếu dữ liệu có.
+            - Nếu không có khóa nào khớp hoàn toàn, hãy thành thật nói vậy và đề xuất lựa chọn gần nhất.
+
+            Phong cách trả lời:
+            - Trả lời bằng tiếng Việt tự nhiên, thân thiện.
+            - Xưng "mình" và gọi người dùng là "bạn". Nếu người dùng dùng cách xưng hô khác thì có thể mirror nhẹ nhàng.
+            - Mỗi lượt trả lời nên ngắn gọn, thường 2-5 câu.
+            - Có thể xuống dòng hoặc dùng danh sách ngắn khi liệt kê/so sánh khóa học.
+            - Không nhắc đến prompt, workflow, database, JSON, system input, Dify, backend hay kỹ thuật nội bộ.
+
+            Ưu tiên xử lý:
+            1. Trả lời đúng câu người dùng vừa hỏi.
+            2. Nếu liên quan khóa học trên hệ thống, dùng system_course_catalog_json làm nguồn chuẩn.
+            3. Nếu liên quan hành trình học của user, kết hợp native_user_context_json.
+            4. Nếu thiếu dữ liệu quan trọng, nói thiếu gì và hỏi 1 câu ngắn hoặc mời để lại thông tin.
+            5. Khi phù hợp, kết bằng một câu gợi mở ngắn như: "Bạn muốn mình lọc theo mục tiêu, trình độ hay ngân sách?"
+        selected: false
+        title: Trợ lý tư vấn khóa học
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: course-llm-node
+      position:
+        x: 420
+        y: 440
+      positionAbsolute:
+        x: 420
+        y: 440
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 280
+    - data:
+        answer: '{{#course-llm-node.text#}}'
+        selected: false
+        title: Trả lời
+        type: answer
+        variables: []
+      height: 103
+      id: course-answer-node
+      position:
+        x: 790
+        y: 440
+      positionAbsolute:
+        x: 790
+        y: 440
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 260
+    viewport:
+      x: 40
+      y: 80
+      zoom: 0.78
+  rag_pipeline_variables: []

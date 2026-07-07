@@ -8,6 +8,7 @@ var app = require('../app');
 var debug = require('debug')('labtest:server');
 var http = require('http');
 var attachSessionSocket = require('../src/websocket/sessionSocket').attachSessionSocket;
+var attachChatWidgetSocket = require('../src/websocket/chatWidgetSocket').attachChatWidgetSocket;
 
 /**
  * Get port from environment and store in Express.
@@ -22,6 +23,7 @@ app.set('port', port);
 
 var server = http.createServer(app);
 attachSessionSocket(server);
+attachChatWidgetSocket(server);
 
 /**
  * Listen on provided port, on all network interfaces.

@@ -1,8 +1,12 @@
 const configModel = require('../models/configModel');
+const { CHAT_WIDGET_CONFIG_KEY } = require('../services/webChatService');
 
 const getConfigs = async (req, res, next) => {
     try {
         const configs = await configModel.getAllConfigs();
+        if (configs && Object.prototype.hasOwnProperty.call(configs, CHAT_WIDGET_CONFIG_KEY)) {
+            delete configs[CHAT_WIDGET_CONFIG_KEY];
+        }
         res.json({
             success: true,
             data: configs
