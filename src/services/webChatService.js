@@ -9,6 +9,7 @@ const CHAT_WIDGET_CONFIG_KEY = 'ai_chat_widget_config';
 const DEFAULT_DIFY_URL = 'https://api.dify.ai/v1';
 const COURSE_CATALOG_LIMIT = 50;
 const COURSE_CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
+const ADMIN_QR_MARKER = '[[ADMIN_QR]]';
 
 let systemCourseCatalogCache = {
   expiresAt: 0,
@@ -94,6 +95,55 @@ const withAccents = (value, fallback = '') => {
   const raw = String(value ?? fallback ?? '').trim();
   if (!raw) return raw;
   return LEGACY_TEXT_MAP.get(raw) || raw;
+};
+
+const normalizeSearchText = (value) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const shouldAppendAdminQr = ({ query = '', answer = '' }) => {
+  const normalizedQuery = normalizeSearchText(query);
+  const normalizedAnswer = normalizeSearchText(answer);
+
+  if (!normalizedAnswer) {
+    return false;
+  }
+
+  const answerMentionsAdminContact =
+    normalizedAnswer.includes('ros pham') ||
+    normalizedAnswer.includes('zalo') ||
+    normalizedAnswer.includes('lien he admin') ||
+    normalizedAnswer.includes('admin zalo');
+
+  const queryMentionsAdminContact =
+    normalizedQuery.includes('admin') ||
+    normalizedQuery.includes('zalo') ||
+    normalizedQuery.includes('qr') ||
+    normalizedQuery.includes('nang cap') ||
+    normalizedQuery.includes('quyen truy cap') ||
+    normalizedQuery.includes('dang ky khoa hoc') ||
+    normalizedQuery.includes('goi cao cap');
+
+  return answerMentionsAdminContact && (queryMentionsAdminContact || normalizedAnswer.includes('ros pham'));
+};
+
+const decorateAssistantAnswer = ({ query = '', answer = '' }) => {
+  const normalizedAnswer = String(answer || '').trim();
+  if (!normalizedAnswer) {
+    return normalizedAnswer;
+  }
+
+  if (normalizedAnswer.includes(ADMIN_QR_MARKER)) {
+    return normalizedAnswer;
+  }
+
+  if (shouldAppendAdminQr({ query, answer: normalizedAnswer })) {
+    return `${normalizedAnswer}\n${ADMIN_QR_MARKER}`;
+  }
+
+  return normalizedAnswer;
 };
 
 const parseJsonSafely = (value, fallback) => {
@@ -562,7 +612,10 @@ const submitLeadCapture = async ({ topicId, lead, sessionId, sourcePage, authUse
       });
 
       if (difyResult?.answer) {
-        assistantReply = difyResult.answer;
+        assistantReply = decorateAssistantAnswer({
+          query: `Khách vừa để lại thông tin từ topic "${topic.label}". Họ tên: ${name}. Số điện thoại: ${phone}.${email ? ` Email: ${email}.` : ''}${note ? ` Nhu cầu thêm: ${note}.` : ''} Hãy gửi một lời xác nhận ngắn gọn và thân thiện.`,
+          answer: difyResult.answer
+        });
       }
     } catch (error) {
       console.warn(`[WebChat] Không thể gọi Dify cho lead topic ${topic.id}: ${error.message}`);
@@ -634,7 +687,10 @@ const sendTopicMessage = async ({
   });
 
   return {
-    answer: difyResult.answer,
+    answer: decorateAssistantAnswer({
+      query,
+      answer: difyResult.answer
+    }),
     conversationId: difyResult.conversationId,
     topic: sanitizePublicTopic(topic)
   };
