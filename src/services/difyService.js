@@ -1,5 +1,35 @@
 // src/services/difyService.js
 
+const normalizeDifyInputValue = (value) => {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  return value;
+};
+
+const normalizeDifyInputs = (inputs = {}) => {
+  if (!inputs || typeof inputs !== 'object' || Array.isArray(inputs)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(inputs).map(([key, value]) => [key, normalizeDifyInputValue(value)])
+  );
+};
+
 async function sendChatMessageWithConfig({
   query,
   user,
@@ -9,8 +39,9 @@ async function sendChatMessageWithConfig({
   inputs = {},
   fallbackContext = {}
 }) {
-  const normalizedLeadStatus = String(inputs?.lead_status || '').trim().toLowerCase();
-  const hasPhone = inputs?.phone && String(inputs.phone).trim() !== '' && String(inputs.phone).trim().toLowerCase() !== 'chưa có' && String(inputs.phone).trim().toLowerCase() !== 'chua co';
+  const normalizedInputs = normalizeDifyInputs(inputs);
+  const normalizedLeadStatus = String(normalizedInputs?.lead_status || '').trim().toLowerCase();
+  const hasPhone = normalizedInputs?.phone && String(normalizedInputs.phone).trim() !== '' && String(normalizedInputs.phone).trim().toLowerCase() !== 'chưa có' && String(normalizedInputs.phone).trim().toLowerCase() !== 'chua co';
 
   // Chế độ DEMO/MOCK nếu chưa cấu hình Dify API Key thực tế
   if (!difyApiKey || difyApiKey.trim() === '' || difyApiKey.includes('YOUR_') || difyApiKey.toLowerCase().includes('mock')) {
@@ -33,7 +64,7 @@ async function sendChatMessageWithConfig({
   
   try {
     const payload = {
-      inputs: inputs || {},
+      inputs: normalizedInputs,
       query: query,
       response_mode: 'blocking',
       user: user

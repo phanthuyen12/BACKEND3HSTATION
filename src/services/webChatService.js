@@ -413,7 +413,7 @@ const buildDifyInputs = ({
       ...baseInputs,
       system_course_catalog: courseCatalog,
       system_course_catalog_json: JSON.stringify(courseCatalog),
-      system_course_count: courseCatalog.courseCount || 0,
+      system_course_count: String(courseCatalog.courseCount || 0),
       system_course_categories: (courseCatalog.categories || []).join(' | '),
       system_course_titles: (courseCatalog.courseTitles || []).join(' | '),
       system_course_summary: courseCatalog.courseSummary || ''
@@ -433,7 +433,7 @@ const buildDifyInputs = ({
       visitor_user_phone: nativeContext.phone || visitorPhone,
       visitor_role: nativeContext.role || 'guest',
       visitor_rank_id: nativeContext.rankId || '',
-      visitor_course_count: nativeContext.courseCount || 0,
+      visitor_course_count: String(nativeContext.courseCount || 0),
       visitor_course_titles: (nativeContext.courseTitles || []).join(' | '),
       visitor_courses_summary: nativeContext.courseSummary || ''
     };
