@@ -60,7 +60,7 @@ router.post(
       password: Joi.string().min(6).required(),
       status: Joi.string().valid('active', 'locked').optional(),
       rankId: Joi.number().integer().positive().optional(),
-      role: Joi.string().valid('user', 'admin', 'super_admin', 'staff', 'viewer').optional(),
+      role: Joi.string().valid('user', 'admin', 'super_admin', 'staff', 'viewer', 'student').optional(),
       permissions: Joi.array().items(Joi.string()).optional()
     })
   }),
@@ -83,7 +83,7 @@ router.put(
       status: Joi.string().valid('active', 'locked').optional(),
       balance: Joi.number().min(0).optional(),
       rankId: Joi.number().integer().positive().allow(null).optional(),
-      role: Joi.string().valid('user', 'admin', 'super_admin', 'staff', 'viewer').optional(),
+      role: Joi.string().valid('user', 'admin', 'super_admin', 'staff', 'viewer', 'student').optional(),
       permissions: Joi.array().items(Joi.string()).allow(null).optional()
     })
   }),
