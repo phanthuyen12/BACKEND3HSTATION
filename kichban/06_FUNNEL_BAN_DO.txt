@@ -1,0 +1,52 @@
+TEN TAI LIEU: PHEU BAN DO LO TRINH HOC
+
+Ten pheu:
+Ban do hoc Trading theo level 0 -> 4
+
+Khi nao dung:
+Khach comment "BAN DO".
+Khach inbox "BAN DO".
+Khach hoi lo trinh hoc.
+Khach hoi nen hoc tu dau.
+Khach hoi nguoi moi bat dau hoc gi.
+
+Muc tieu:
+Xac dinh cap do hien tai cua khach.
+Gui dung lo trinh hoc tap.
+Dan khach vao cong dong neu phu hop.
+
+Luot 1:
+Chao ban, minh thay ban de lai tu khoa "BAN DO" nen phan hoi ban day.
+Minh co bo lo trinh hoc Trading duoc sap theo tung giai doan, giup ban biet minh dang o dau va nen hoc gi tiep theo.
+Truoc khi gui, minh hoi ban 1 cau nhe: hien tai ban dang o giai doan nao?
+
+Luot 2:
+0. Level 0 - Chua biet gi, muon bat dau tu dau
+1. Level 1 - Da biet co ban, dang hoc nen va doc bieu do
+2. Level 2 - Da giao dich nhung chua co phuong phap on dinh
+3. Level 3 - Co phuong phap, dang ren ky luat va quan tri von
+4. Level 4 - Muon nang cao tu duy, toi uu he thong va tam ly giao dich
+
+Luot 3 neu khach chon level 0-1:
+Di dung lo trinh tu dau se giup ban tiet kiem nhieu thoi gian va tranh cac loi co ban ma trader moi hay gap.
+Minh gui dung bo tai lieu danh cho level 0-1 cho ban nhe?
+
+Luot 3 neu khach chon level 2-3:
+Day la giai doan nhieu nguoi vuong nhat.
+Thuong van de khong nam o viec thieu kien thuc, ma la chua co he thong giao dich va quan tri von du on dinh.
+Minh gui ban dung phan tai lieu cho giai doan nay nhe?
+
+Luot 3 neu khach chon level 4:
+Ban dang o giai doan can toi uu tu duy, tam ly va he thong giao dich nhieu hon la hoc lan rong them.
+Minh gui ban bo tai lieu nang cao danh cho level 4 nhe?
+
+Luot 4:
+Minh gui ban tai day nhe:
+Ban do hoc tap danh cho Trader
+https://aetrading88.notion.site/B-n-Kho-B-u-Cho-C-c-Trader-6c341167464d83e093e181ff8a1548f5
+Ban chi can di theo dung thu tu trong lo trinh la se biet moi giai doan nen tap trung vao phan nao truoc.
+
+Luot 5:
+Ban do se giup ban nhin ro duong di, con cong dong se giup ban bot hoc mot minh va han che sai lam khong can thiet.
+Neu ban muon theo doi them chia se thuc chien, phan tich thi truong va phan ho tro trong luc hoc, minh gui ban link cong dong nhe.
+https://hub.aetrading.vn/?ref=fanmnv723

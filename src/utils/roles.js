@@ -3,7 +3,7 @@ const normalizeRole = (role) => {
   return role || 'student';
 };
 
-const isPrivilegedRole = (role) => ['admin', 'super_admin'].includes(role);
+const isPrivilegedRole = (role) => ['admin', 'super_admin', 'staff', 'viewer'].includes(role);
 
 module.exports = {
   normalizeRole,

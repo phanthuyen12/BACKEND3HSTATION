@@ -3,6 +3,7 @@ const path = require('path');
 
 const morgan = require('morgan');
 const apiRoutes = require('./routes');
+const landingPageServingMiddleware = require('./middlewares/landingPageServingMiddleware');
 const env = require('./config/env');
 const notFound = require('./middlewares/notFound');
 const errorHandler = require('./middlewares/errorHandler');
@@ -29,12 +30,15 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 const allowedOrigins = new Set([
   'http://localhost:5173',
+  'https://api.aetrading.vn',
   'http://127.0.0.1:5173',
   'http://localhost:4173',
   'http://127.0.0.1:4173',
   'https://api.aetrading.vn',
   'http://127.0.0.1:3000',
   'https://academy.aetrading.vn',
+  'https://page.aetrading.vn',
+
   'https://aetrading.vn',
 ]);
 
@@ -62,6 +66,8 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/api', apiRoutes);
+
+app.use(landingPageServingMiddleware);
 
 app.use(notFound);
 app.use(errorHandler);

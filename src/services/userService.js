@@ -210,11 +210,21 @@ const getUserById = async (id) => {
   const orders = await userModel.getUserOrdersStats(parseInt(id));
   const directRefCount = await userModel.countDirectRefs(parseInt(id));
 
+  let parsedPermissions = [];
+  if (user.permissions) {
+    try {
+      parsedPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions;
+    } catch (e) {
+      parsedPermissions = [];
+    }
+  }
+
   return {
     id: String(user.id),
     name: user.name,
     email: user.email,
     role: normalizeRole(user.role),
+    permissions: parsedPermissions,
     phone: user.phone || '',
     rank: formatRankFromUser(user),
     balance: parseFloat(user.balance || 0),
@@ -239,7 +249,7 @@ const getUserById = async (id) => {
   };
 };
 
-const createUser = async ({ name, email, phone, password, status, rankId, role = 'user' }) => {
+const createUser = async ({ name, email, phone, password, status, rankId, role = 'user', permissions = null }) => {
   const existing = await userModel.getUserByEmail(email);
   if (existing) {
     throw ApiError.badRequest('Email already exists');
@@ -258,7 +268,8 @@ const createUser = async ({ name, email, phone, password, status, rankId, role =
     passwordHash,
     status: status || 'active',
     rankId: finalRankId,
-    role: role || 'user'
+    role: role || 'user',
+    permissions
   });
 
   return formatUserResponse(user);
@@ -282,6 +293,8 @@ const updateUser = async (id, payload) => {
     email: payload.email,
     phone: payload.phone,
     status: payload.status,
+    role: payload.role,
+    permissions: payload.permissions,
     balance: payload.balance,
     rankId: payload.rankId
   });
@@ -453,12 +466,22 @@ const getMyDashboard = async (userId) => {
 };
 
 const formatUserResponse = (user) => {
+  let parsedPermissions = [];
+  if (user.permissions) {
+    try {
+      parsedPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions;
+    } catch (e) {
+      parsedPermissions = [];
+    }
+  }
+
   return {
     id: String(user.id),
     name: user.name,
     email: user.email,
     phone: user.phone || '',
     role: normalizeRole(user.role),
+    permissions: parsedPermissions,
     rank: formatRankFromUser(user),
     balance: parseFloat(user.balance || 0),
     status: user.status || 'active',

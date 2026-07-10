@@ -19,6 +19,7 @@ const userSelectFields = `
   u.created_at,
   u.updated_at,
   u.last_login_at,
+  u.permissions,
   r.code AS rank_code,
   r.name AS rank_name,
   r.description AS rank_description,
@@ -82,12 +83,13 @@ const countUsers = async ({ search, status }) => {
   return rows[0]?.total || 0;
 };
 
-const createUser = async ({ name, email, passwordHash, avatarUrl = null, role = 'user', rankId = null, phone = null, status = 'active', refCode = null, refBy = null, apiToken = null }) => {
+const createUser = async ({ name, email, passwordHash, avatarUrl = null, role = 'user', permissions = null, rankId = null, phone = null, status = 'active', refCode = null, refBy = null, apiToken = null }) => {
+  const permissionsStr = permissions ? (Array.isArray(permissions) ? JSON.stringify(permissions) : permissions) : null;
   const sql = `
-    INSERT INTO users (name, email, password_hash, avatar_url, role, rank_id, phone, status, ref_code, ref_by, api_token)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO users (name, email, password_hash, avatar_url, role, permissions, rank_id, phone, status, ref_code, ref_by, api_token)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
-  const [result] = await execute(sql, [name, email, passwordHash, avatarUrl, role, rankId, phone, status, refCode, refBy, apiToken]);
+  const [result] = await execute(sql, [name, email, passwordHash, avatarUrl, role, permissionsStr, rankId, phone, status, refCode, refBy, apiToken]);
   return getUserById(result.insertId);
 };
 
@@ -117,6 +119,8 @@ const updateUser = async (id, data) => {
     avatar_url: data.avatarUrl,
     password_hash: data.passwordHash,
     status: data.status,
+    role: data.role,
+    permissions: data.permissions !== undefined ? (Array.isArray(data.permissions) ? JSON.stringify(data.permissions) : data.permissions) : undefined,
     balance: data.balance,
     address: data.address,
     ref_code: data.refCode,
@@ -132,6 +136,7 @@ const updateUser = async (id, data) => {
   const nullableColumns = new Set([
     'avatar_url',
     'rank_id',
+    'permissions',
     'reset_password_token',
     'reset_password_expires'
   ]);

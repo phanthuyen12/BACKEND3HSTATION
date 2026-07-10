@@ -60,6 +60,7 @@ const webChatRoutes = require('./webChatRoutes');
 const router = express.Router();
 const adminFacebookRoutes = require('./adminFacebookRoutes');
 const facebookWebhookRoutes = require('./facebookWebhookRoutes');
+const landingPageRoutes = require('./landingPageRoutes');
 
 // Authentication
 router.use('/auth', authRoutes);
@@ -91,6 +92,7 @@ router.use('/configs', configRoutes);
 router.use('/support', supportRoutes);
 router.use('/web-chat', webChatRoutes);
 router.use('/admin/tool-packages', toolPackagesRoutes); 
+router.use('/admin/landing-pages', landingPageRoutes);
 
 // Client APIs
 router.use('/client/elearning', clientElearningRoutes);
