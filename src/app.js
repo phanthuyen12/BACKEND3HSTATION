@@ -38,7 +38,6 @@ const allowedOrigins = new Set([
   'http://127.0.0.1:3000',
   'https://academy.aetrading.vn',
   'https://page.aetrading.vn',
-
   'https://aetrading.vn',
 ]);
 
