@@ -25,7 +25,6 @@ const cleanDangerousFiles = (dir) => {
       cleanDangerousFiles(fullPath);
     } else {
       const ext = path.extname(file).toLowerCase();
-      // Block double extensions or files with no extensions if needed, but simple blacklist/whitelist check is standard
       if (!ALLOWED_EXTENSIONS.has(ext)) {
         try {
           fs.unlinkSync(fullPath);
@@ -39,7 +38,48 @@ const cleanDangerousFiles = (dir) => {
 };
 
 /**
- * Extract zip using system unzip command
+ * Strip single root folder if ZIP was packed with a root directory.
+ * 
+ * Common ZIP structures from web projects:
+ *   myproject.zip
+ *   └── myproject/         ← single root folder
+ *       ├── index.html
+ *       ├── images/
+ *       ├── css/
+ *       └── js/
+ * 
+ * After strip, contents will be at:
+ *   draft/index.html
+ *   draft/images/
+ *   draft/css/
+ *   draft/js/
+ */
+const stripRootFolder = (dir) => {
+  if (!fs.existsSync(dir)) return;
+
+  const entries = fs.readdirSync(dir);
+
+  // Only strip if there is exactly ONE entry and it is a directory
+  if (entries.length === 1) {
+    const singleEntryPath = path.join(dir, entries[0]);
+    const stat = fs.statSync(singleEntryPath);
+
+    if (stat.isDirectory()) {
+      console.log(`[ZIP] Auto-stripping root folder: "${entries[0]}"`);
+      const innerEntries = fs.readdirSync(singleEntryPath);
+      for (const entry of innerEntries) {
+        const src = path.join(singleEntryPath, entry);
+        const dest = path.join(dir, entry);
+        fs.renameSync(src, dest);
+      }
+      fs.rmdirSync(singleEntryPath);
+      console.log(`[ZIP] Root folder stripped. Files now at draft root.`);
+    }
+  }
+};
+
+/**
+ * Extract zip using system unzip command, then strip root folder if needed.
  */
 const extractZip = (zipFilePath, targetDir) => {
   return new Promise((resolve, reject) => {
@@ -54,11 +94,14 @@ const extractZip = (zipFilePath, targetDir) => {
       }
 
       try {
-        // Enforce file whitelist check on extracted contents
+        // Auto-strip single root folder (handles standard project ZIP structures)
+        stripRootFolder(targetDir);
+
+        // Security: remove dangerous file types
         cleanDangerousFiles(targetDir);
         resolve();
       } catch (err) {
-        reject(new Error(`Extraction succeeded but security sanitization failed: ${err.message}`));
+        reject(new Error(`Extraction succeeded but post-processing failed: ${err.message}`));
       }
     });
   });

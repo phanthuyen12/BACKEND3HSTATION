@@ -31,6 +31,29 @@ const compileHtml = (htmlContent, cssContent, jsContent) => {
   return compiled;
 };
 
+/**
+ * Injects a <base href> tag into <head> so that relative asset paths
+ * (images/, css/, js/, fonts/) resolve correctly relative to the landing page path.
+ * Example: LP path = "/page01" → <base href="/page01/">
+ * Then src="images/banner.jpg" resolves to "/page01/images/banner.jpg" automatically.
+ */
+const injectBaseHref = (htmlContent, lpPath) => {
+  // No need to inject if page is served at root /
+  if (!lpPath || lpPath === '/') return htmlContent;
+
+  const normalizedPath = lpPath.endsWith('/') ? lpPath : lpPath + '/';
+  const baseTag = `<base href="${normalizedPath}">`;
+
+  if (htmlContent.includes('<head>')) {
+    return htmlContent.replace('<head>', `<head>\n  ${baseTag}`);
+  } else if (htmlContent.match(/<head[^>]*>/i)) {
+    return htmlContent.replace(/<head[^>]*>/i, (m) => `${m}\n  ${baseTag}`);
+  }
+  // No <head> tag — prepend base tag at top
+  return baseTag + '\n' + htmlContent;
+};
+
+
 const landingPageServingMiddleware = async (req, res, next) => {
   // 1. Skip API and Health Check routes
   if (req.path.startsWith('/api') || req.path === '/health') {
@@ -66,8 +89,8 @@ const landingPageServingMiddleware = async (req, res, next) => {
         if (lp.draft_assets_path) {
           const indexHtmlPath = path.join(UPLOADS_DIR, 'landing-pages', String(lp.id), 'draft', 'index.html');
           if (fs.existsSync(indexHtmlPath)) {
-            // Read index.html and inject draft CSS/JS if any (in case they write inline CSS/JS too)
             let html = fs.readFileSync(indexHtmlPath, 'utf8');
+            html = injectBaseHref(html, lp.path);
             html = compileHtml(html, lp.draft_css, lp.draft_js);
             return res.send(html);
           } else {
@@ -187,6 +210,7 @@ const landingPageServingMiddleware = async (req, res, next) => {
         const indexHtmlPath = path.join(UPLOADS_DIR, 'landing-pages', String(matchedLp.id), 'versions', String(activeVersion.version_number), 'index.html');
         if (fs.existsSync(indexHtmlPath)) {
           let html = fs.readFileSync(indexHtmlPath, 'utf8');
+          html = injectBaseHref(html, matchedLp.path);
           html = compileHtml(html, activeVersion.css, activeVersion.js);
           return res.send(html);
         } else {
