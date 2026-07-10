@@ -40,6 +40,9 @@ const landingPageServingMiddleware = async (req, res, next) => {
   const requestHost = req.hostname; // e.g., 'localhost' or 'landing.domain.com'
   const requestPath = req.path; // e.g., '/khuyen-mai' or '/css/style.css'
 
+  // 🔍 DEBUG LOG — xóa sau khi fix xong
+  console.log(`[LP-DEBUG] ► Host: "${requestHost}" | Path: "${requestPath}"`);
+
   // 2. PRIVATE PREVIEW ROUTE
   // Match format: /preview/lp/:token (and subpaths)
   const previewRegex = /^\/preview\/lp\/([a-f0-9]{64})(.*)/;
@@ -103,6 +106,10 @@ const landingPageServingMiddleware = async (req, res, next) => {
       lp.domain.toLowerCase() === requestHost.toLowerCase() && 
       (lp.status === 'published' || lp.status === 'scheduled')
     );
+
+    // 🔍 DEBUG LOG — xóa sau khi fix xong
+    console.log(`[LP-DEBUG] ► All domains in DB:`, candidates.map(lp => `"${lp.domain}" (${lp.status})`));
+    console.log(`[LP-DEBUG] ► Matched pages for host "${requestHost}": ${hostPages.length}`);
 
     if (hostPages.length === 0) {
       return next(); // No landing pages configured for this hostname, continue to normal routing
