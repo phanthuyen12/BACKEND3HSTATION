@@ -57,6 +57,13 @@ const cleanDangerousFiles = (dir) => {
 const stripRootFolder = (dir) => {
   if (!fs.existsSync(dir)) return;
 
+  // Clean Mac cruft at root first before checking for single root folder
+  const macOsxPath = path.join(dir, '__MACOSX');
+  if (fs.existsSync(macOsxPath)) fs.rmSync(macOsxPath, { recursive: true, force: true });
+  
+  const dsStorePath = path.join(dir, '.DS_Store');
+  if (fs.existsSync(dsStorePath)) fs.rmSync(dsStorePath, { force: true });
+
   const entries = fs.readdirSync(dir);
 
   // Only strip if there is exactly ONE entry and it is a directory
