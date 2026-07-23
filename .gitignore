@@ -1,1 +1,4 @@
 .env
+
+# Private Google service-account key. Never publish or commit this file.
+config/credentials/google-service-account.json

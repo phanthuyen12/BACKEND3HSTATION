@@ -5,6 +5,7 @@ const landingPageModel = require('../models/landingPageModel');
 const { extractZip } = require('../utils/zip');
 const ApiError = require('../utils/apiError');
 const asyncHandler = require('../utils/asyncHandler');
+const googleSheetsLandingService = require('../services/googleSheetsLandingService');
 
 // Base directory for uploads
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
@@ -66,7 +67,10 @@ const getLandingPage = asyncHandler(async (req, res) => {
 });
 
 const createLandingPage = asyncHandler(async (req, res) => {
-  const { title, domain, path: lpPath, status, publish_start_at, publish_end_at, draft_html, draft_css, draft_js } = req.body;
+  const {
+    title, domain, path: lpPath, status, publish_start_at, publish_end_at,
+    draft_html, draft_css, draft_js, google_sheet_id, google_sheet_tab_name
+  } = req.body;
   
   if (!title || !domain || !lpPath) {
     throw ApiError.badRequest('Title, domain, and path are required');
@@ -100,6 +104,8 @@ const createLandingPage = asyncHandler(async (req, res) => {
     draft_html,
     draft_css,
     draft_js,
+    google_sheet_id: google_sheet_id?.trim() || null,
+    google_sheet_tab_name: google_sheet_tab_name?.trim() || null,
     preview_token: previewToken
   });
 
@@ -115,7 +121,10 @@ const createLandingPage = asyncHandler(async (req, res) => {
 
 const updateLandingPage = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { title, domain, path: lpPath, status, publish_start_at, publish_end_at, draft_html, draft_css, draft_js } = req.body;
+  const {
+    title, domain, path: lpPath, status, publish_start_at, publish_end_at,
+    draft_html, draft_css, draft_js, google_sheet_id, google_sheet_tab_name
+  } = req.body;
 
   const lp = await landingPageModel.getLandingPageById(id);
   if (!lp) {
@@ -154,6 +163,12 @@ const updateLandingPage = asyncHandler(async (req, res) => {
   if (draft_html !== undefined) updateData.draft_html = draft_html;
   if (draft_css !== undefined) updateData.draft_css = draft_css;
   if (draft_js !== undefined) updateData.draft_js = draft_js;
+  if (google_sheet_id !== undefined) {
+    updateData.google_sheet_id = String(google_sheet_id || '').trim() || null;
+  }
+  if (google_sheet_tab_name !== undefined) {
+    updateData.google_sheet_tab_name = String(google_sheet_tab_name || '').trim() || null;
+  }
 
   const updated = await landingPageModel.updateLandingPage(id, updateData);
 
@@ -491,20 +506,42 @@ const submitLead = asyncHandler(async (req, res) => {
   }
 
   // Exclude administrative parameters or internal settings, save everything else
-  const fields = { ...req.body };
-  const redirectUrl = fields._redirect || fields.redirect_url || null;
+  // Accept both the documented flat payload and older integrations that send
+  // `{ fields: {...} }`, but always persist one flat fields object.
+  const requestBody = req.body && typeof req.body === 'object' ? req.body : {};
+  const fields = requestBody.fields
+    && typeof requestBody.fields === 'object'
+    && !Array.isArray(requestBody.fields)
+      ? { ...requestBody.fields }
+      : { ...requestBody };
+  const redirectUrl = requestBody._redirect || requestBody.redirect_url || fields._redirect || fields.redirect_url || null;
   delete fields._redirect;
   delete fields.redirect_url;
 
   const ipAddress = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress;
   const userAgent = req.headers['user-agent'];
 
-  await landingPageModel.createSubmission({
+  const submission = await landingPageModel.createSubmission({
     landing_page_id: id,
     fields,
     ip_address: ipAddress,
     user_agent: userAgent
   });
+
+  // Database is the source of truth. A temporary Google error must never lose
+  // or reject a lead that was already submitted from a landing page.
+  try {
+    const sheetResult = await googleSheetsLandingService.appendLandingSubmission({
+      landingPage: lp,
+      submission,
+      fields
+    });
+    if (sheetResult.skipped && sheetResult.reason === 'missing_credentials') {
+      console.warn('[Landing Sheets] Chưa có service account JSON, tạm chỉ lưu lead vào database.');
+    }
+  } catch (error) {
+    console.error('[Landing Sheets] Đồng bộ thất bại:', error.message);
+  }
 
   // Handle browser redirect or JSON AJAX response
   if (redirectUrl) {

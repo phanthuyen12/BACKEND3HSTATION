@@ -15,12 +15,12 @@ const ALLOWED_EXTENSIONS = new Set([
  */
 const cleanDangerousFiles = (dir) => {
   if (!fs.existsSync(dir)) return;
-  
+
   const files = fs.readdirSync(dir);
   for (const file of files) {
     const fullPath = path.join(dir, file);
     const stat = fs.statSync(fullPath);
-    
+
     if (stat.isDirectory()) {
       cleanDangerousFiles(fullPath);
     } else {
@@ -60,7 +60,7 @@ const stripRootFolder = (dir) => {
   // Clean Mac cruft at root first before checking for single root folder
   const macOsxPath = path.join(dir, '__MACOSX');
   if (fs.existsSync(macOsxPath)) fs.rmSync(macOsxPath, { recursive: true, force: true });
-  
+
   const dsStorePath = path.join(dir, '.DS_Store');
   if (fs.existsSync(dsStorePath)) fs.rmSync(dsStorePath, { force: true });
 

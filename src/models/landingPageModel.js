@@ -118,8 +118,9 @@ const createLandingPage = async (data) => {
   const sql = `
     INSERT INTO landing_pages (
       title, domain, path, status, publish_start_at, publish_end_at, 
-      created_by, draft_html, draft_css, draft_js, draft_assets_path, preview_token
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      created_by, draft_html, draft_css, draft_js, draft_assets_path, preview_token,
+      google_sheet_id, google_sheet_tab_name
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const params = [
     data.title,
@@ -133,7 +134,9 @@ const createLandingPage = async (data) => {
     data.draft_css || null,
     data.draft_js || null,
     data.draft_assets_path || null,
-    data.preview_token
+    data.preview_token,
+    data.google_sheet_id || null,
+    data.google_sheet_tab_name || null
   ];
 
   const [result] = await execute(sql, params);
@@ -146,7 +149,8 @@ const updateLandingPage = async (id, data) => {
 
   const allowedFields = [
     'title', 'domain', 'path', 'status', 'publish_start_at', 'publish_end_at',
-    'active_version_id', 'draft_html', 'draft_css', 'draft_js', 'draft_assets_path'
+    'active_version_id', 'draft_html', 'draft_css', 'draft_js', 'draft_assets_path',
+    'google_sheet_id', 'google_sheet_tab_name'
   ];
 
   Object.keys(data).forEach((key) => {
