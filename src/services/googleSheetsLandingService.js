@@ -121,14 +121,15 @@ function normalizeHeader(header) {
   return String(header || '').trim().toLocaleLowerCase('vi-VN');
 }
 
-function mergeRequiredHeaders(currentHeaders) {
+function mergeRequiredHeaders(currentHeaders, fieldNames = []) {
   const headers = currentHeaders.map(value => String(value));
   const existing = new Set(headers.map(normalizeHeader).filter(Boolean));
 
-  for (const header of HEADER) {
+  for (const header of [...HEADER, ...fieldNames]) {
+    if (!String(header || '').trim()) continue;
     const normalized = normalizeHeader(header);
     if (!existing.has(normalized)) {
-      headers.push(header);
+      headers.push(String(header));
       existing.add(normalized);
     }
   }
@@ -136,7 +137,7 @@ function mergeRequiredHeaders(currentHeaders) {
   return headers;
 }
 
-async function ensureSheetAndHeader(spreadsheetId, sheetName, token) {
+async function ensureSheetAndHeader(spreadsheetId, sheetName, token, fieldNames = []) {
   const spreadsheetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=sheets.properties.title`;
   const spreadsheet = await sheetsRequest(spreadsheetUrl, token);
   const exists = (spreadsheet.sheets || []).some(sheet => sheet.properties?.title === sheetName);
@@ -165,11 +166,11 @@ async function ensureSheetAndHeader(spreadsheetId, sheetName, token) {
   const current = await sheetsRequest(baseUrl, token);
   const currentHeaders = current.values?.[0]?.map(value => String(value)) || [];
   const hasHeader = currentHeaders.some(header => header.trim() !== '');
-  const headers = hasHeader ? mergeRequiredHeaders(currentHeaders) : [...HEADER];
+  const headers = mergeRequiredHeaders(hasHeader ? currentHeaders : [], fieldNames);
 
   // Existing landing tabs may have been created with an older/custom header.
-  // Keep those columns intact and append any missing standard columns so
-  // "Dữ liệu đầy đủ" is also available without recreating the tab.
+  // Keep those columns intact and append both the standard columns and one
+  // column per submitted form field without recreating the tab.
   if (!hasHeader || headers.length !== currentHeaders.length) {
     await sheetsRequest(`${baseUrl}?valueInputOption=RAW`, token, {
       method: 'PUT',
@@ -261,7 +262,12 @@ async function appendLandingSubmission({ landingPage, submission, fields }) {
 
   const sheetName = landingSheetName(landingPage);
   const token = await accessToken(credentials);
-  const headers = await ensureSheetAndHeader(spreadsheetId, sheetName, token);
+  const headers = await ensureSheetAndHeader(
+    spreadsheetId,
+    sheetName,
+    token,
+    Object.keys(fields)
+  );
   const row = rowForHeaders({ headers, landingPage, submission, fields });
   const lastColumn = columnName(headers.length);
   const range = encodeURIComponent(`${quoteSheetName(sheetName)}!A:${lastColumn}`);
