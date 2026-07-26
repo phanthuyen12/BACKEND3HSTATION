@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { spawn } = require('child_process');
 const landingPageModel = require('../models/landingPageModel');
 const { extractZip } = require('../utils/zip');
 const ApiError = require('../utils/apiError');
@@ -64,6 +65,72 @@ const getLandingPage = asyncHandler(async (req, res) => {
     throw ApiError.notFound('Landing Page not found');
   }
   res.json({ success: true, data: lp });
+});
+
+const sanitizeDownloadName = (value, fallback) => {
+  const sanitized = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 100);
+  return sanitized || fallback;
+};
+
+/**
+ * Export the current draft source.
+ * ZIP imports have a draft assets directory, so rebuild a complete ZIP package.
+ * HTML-only landings are returned as a single HTML file.
+ */
+const exportLandingPage = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const lp = await landingPageModel.getLandingPageById(id);
+  if (!lp) {
+    throw ApiError.notFound('Landing Page not found');
+  }
+
+  const baseName = sanitizeDownloadName(lp.title, `landing-page-${id}`);
+  const draftDir = path.join(UPLOADS_DIR, 'landing-pages', String(id), 'draft');
+  const hasZipAssets = Boolean(lp.draft_assets_path)
+    && fs.existsSync(draftDir)
+    && fs.statSync(draftDir).isDirectory();
+
+  if (!hasZipAssets) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${baseName}.html"`);
+    return res.send(lp.draft_html || '');
+  }
+
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="${baseName}.zip"`);
+
+  // Stream the rebuilt archive instead of loading the full ZIP into memory.
+  const zipProcess = spawn('zip', ['-r', '-q', '-', '.'], { cwd: draftDir });
+  zipProcess.stdout.pipe(res);
+
+  let stderr = '';
+  zipProcess.stderr.on('data', (chunk) => {
+    stderr += chunk.toString();
+  });
+  zipProcess.on('error', (error) => {
+    console.error('[LANDING EXPORT] Failed to start zip:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: 'Không thể tạo file ZIP để tải xuống' });
+    } else {
+      res.destroy(error);
+    }
+  });
+  zipProcess.on('close', (code) => {
+    if (code !== 0) {
+      const error = new Error(stderr || `zip exited with code ${code}`);
+      console.error('[LANDING EXPORT] Failed to create zip:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: 'Không thể tạo file ZIP để tải xuống' });
+      } else if (!res.writableEnded) {
+        res.destroy(error);
+      }
+    }
+  });
 });
 
 const createLandingPage = asyncHandler(async (req, res) => {
@@ -649,6 +716,7 @@ module.exports = {
   removeDomain,
   getLandingPages,
   getLandingPage,
+  exportLandingPage,
   createLandingPage,
   updateLandingPage,
   deleteLandingPage,

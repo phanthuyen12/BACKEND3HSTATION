@@ -45,6 +45,7 @@ router.delete('/domains/:id', authorizeRoles('admin', 'staff'), landingPageContr
 
 // Landing Pages list & CRUD
 router.get('/', authorizeRoles('admin', 'staff', 'viewer'), landingPageController.getLandingPages);
+router.get('/:id/export', authorizeRoles('admin', 'staff', 'viewer'), landingPageController.exportLandingPage);
 router.get('/:id', authorizeRoles('admin', 'staff', 'viewer'), landingPageController.getLandingPage);
 router.post('/', authorizeRoles('admin', 'staff'), landingPageController.createLandingPage);
 router.put('/:id', authorizeRoles('admin', 'staff'), landingPageController.updateLandingPage);
