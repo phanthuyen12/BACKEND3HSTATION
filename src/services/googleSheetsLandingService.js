@@ -117,6 +117,25 @@ function landingSheetName(landingPage) {
     .slice(0, 100);
 }
 
+function normalizeHeader(header) {
+  return String(header || '').trim().toLocaleLowerCase('vi-VN');
+}
+
+function mergeRequiredHeaders(currentHeaders) {
+  const headers = currentHeaders.map(value => String(value));
+  const existing = new Set(headers.map(normalizeHeader).filter(Boolean));
+
+  for (const header of HEADER) {
+    const normalized = normalizeHeader(header);
+    if (!existing.has(normalized)) {
+      headers.push(header);
+      existing.add(normalized);
+    }
+  }
+
+  return headers;
+}
+
 async function ensureSheetAndHeader(spreadsheetId, sheetName, token) {
   const spreadsheetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=sheets.properties.title`;
   const spreadsheet = await sheetsRequest(spreadsheetUrl, token);
@@ -144,10 +163,14 @@ async function ensureSheetAndHeader(spreadsheetId, sheetName, token) {
   const range = encodeURIComponent(`${quoteSheetName(sheetName)}!A1:ZZ1`);
   const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${range}`;
   const current = await sheetsRequest(baseUrl, token);
-  let headers = current.values?.[0]?.map(value => String(value)) || [];
+  const currentHeaders = current.values?.[0]?.map(value => String(value)) || [];
+  const hasHeader = currentHeaders.some(header => header.trim() !== '');
+  const headers = hasHeader ? mergeRequiredHeaders(currentHeaders) : [...HEADER];
 
-  if (!headers.some(header => header.trim() !== '')) {
-    headers = [...HEADER];
+  // Existing landing tabs may have been created with an older/custom header.
+  // Keep those columns intact and append any missing standard columns so
+  // "Dữ liệu đầy đủ" is also available without recreating the tab.
+  if (!hasHeader || headers.length !== currentHeaders.length) {
     await sheetsRequest(`${baseUrl}?valueInputOption=RAW`, token, {
       method: 'PUT',
       body: JSON.stringify({ values: [headers] })
@@ -215,7 +238,7 @@ function rowForHeaders({ headers, landingPage, submission, fields, submittedAt =
 
   return headers.map(header => {
     const originalHeader = String(header || '').trim();
-    const normalizedHeader = originalHeader.toLocaleLowerCase('vi-VN');
+    const normalizedHeader = normalizeHeader(originalHeader);
     if (Object.prototype.hasOwnProperty.call(standardValues, normalizedHeader)) {
       return standardValues[normalizedHeader];
     }
@@ -277,5 +300,6 @@ module.exports = {
   extractSpreadsheetId,
   normalizeContactFields,
   rowForHeaders,
-  columnName
+  columnName,
+  mergeRequiredHeaders
 };
