@@ -18,7 +18,6 @@ const HEADER = [
 
 let cachedToken = null;
 let cachedTokenExpiresAt = 0;
-const readySheets = new Set();
 
 function base64Url(value) {
   return Buffer.from(value)
@@ -119,9 +118,6 @@ function landingSheetName(landingPage) {
 }
 
 async function ensureSheetAndHeader(spreadsheetId, sheetName, token) {
-  const readyKey = `${spreadsheetId}:${sheetName}`;
-  if (readySheets.has(readyKey)) return;
-
   const spreadsheetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=sheets.properties.title`;
   const spreadsheet = await sheetsRequest(spreadsheetUrl, token);
   const exists = (spreadsheet.sheets || []).some(sheet => sheet.properties?.title === sheetName);
@@ -145,17 +141,20 @@ async function ensureSheetAndHeader(spreadsheetId, sheetName, token) {
     }
   }
 
-  const range = encodeURIComponent(`${quoteSheetName(sheetName)}!A1:J1`);
+  const range = encodeURIComponent(`${quoteSheetName(sheetName)}!A1:ZZ1`);
   const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${range}`;
   const current = await sheetsRequest(baseUrl, token);
+  let headers = current.values?.[0]?.map(value => String(value)) || [];
 
-  if (!current.values || !current.values.length) {
+  if (!headers.some(header => header.trim() !== '')) {
+    headers = [...HEADER];
     await sheetsRequest(`${baseUrl}?valueInputOption=RAW`, token, {
       method: 'PUT',
-      body: JSON.stringify({ values: [HEADER] })
+      body: JSON.stringify({ values: [headers] })
     });
   }
-  readySheets.add(readyKey);
+
+  return headers;
 }
 
 function pick(fields, names) {
@@ -163,6 +162,69 @@ function pick(fields, names) {
     if (fields[name] !== undefined && fields[name] !== null) return String(fields[name]);
   }
   return '';
+}
+
+function normalizeContactFields(fields) {
+  let name = pick(fields, ['ho_ten', 'full_name', 'name', 'hoten']).trim();
+  let email = pick(fields, ['email', 'email_address']).trim();
+
+  // Some custom landing pages submit an email address using the `ho_ten`
+  // field. Preserve the original name value and also populate Email.
+  if (!email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(name)) {
+    email = name;
+  }
+
+  return {
+    name,
+    phone: pick(fields, ['so_dien_thoai', 'phone', 'phone_number', 'sdt']).trim(),
+    email,
+    adminSupport: pick(fields, [
+      'admin_ho_tro',
+      'admin_dang_ho_tro',
+      'admin_support'
+    ]).trim(),
+    source: pick(fields, ['source', 'nguon', 'utm_source']).trim()
+  };
+}
+
+function columnName(columnNumber) {
+  let value = Number(columnNumber);
+  let result = '';
+  while (value > 0) {
+    value -= 1;
+    result = String.fromCharCode(65 + (value % 26)) + result;
+    value = Math.floor(value / 26);
+  }
+  return result || 'A';
+}
+
+function rowForHeaders({ headers, landingPage, submission, fields, submittedAt = new Date().toISOString() }) {
+  const contact = normalizeContactFields(fields);
+  const standardValues = {
+    'thời gian': submittedAt,
+    'submission id': submission?.id || '',
+    'landing id': landingPage.id,
+    'tên landing': landingPage.title || '',
+    'họ tên': contact.name,
+    'số điện thoại': contact.phone,
+    'email': contact.email,
+    'admin hỗ trợ': contact.adminSupport,
+    'nguồn': contact.source,
+    'dữ liệu đầy đủ': JSON.stringify(fields)
+  };
+
+  return headers.map(header => {
+    const originalHeader = String(header || '').trim();
+    const normalizedHeader = originalHeader.toLocaleLowerCase('vi-VN');
+    if (Object.prototype.hasOwnProperty.call(standardValues, normalizedHeader)) {
+      return standardValues[normalizedHeader];
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, originalHeader)) {
+      const value = fields[originalHeader];
+      return value === undefined || value === null ? '' : String(value);
+    }
+    return '';
+  });
 }
 
 async function appendLandingSubmission({ landingPage, submission, fields }) {
@@ -176,21 +238,10 @@ async function appendLandingSubmission({ landingPage, submission, fields }) {
 
   const sheetName = landingSheetName(landingPage);
   const token = await accessToken(credentials);
-  await ensureSheetAndHeader(spreadsheetId, sheetName, token);
-
-  const row = [
-    new Date().toISOString(),
-    submission?.id || '',
-    landingPage.id,
-    landingPage.title || '',
-    pick(fields, ['ho_ten', 'full_name', 'name', 'hoten']),
-    pick(fields, ['so_dien_thoai', 'phone', 'phone_number', 'sdt']),
-    pick(fields, ['email']),
-    pick(fields, ['admin_ho_tro', 'admin_support']),
-    pick(fields, ['source', 'utm_source']),
-    JSON.stringify(fields)
-  ];
-  const range = encodeURIComponent(`${quoteSheetName(sheetName)}!A:J`);
+  const headers = await ensureSheetAndHeader(spreadsheetId, sheetName, token);
+  const row = rowForHeaders({ headers, landingPage, submission, fields });
+  const lastColumn = columnName(headers.length);
+  const range = encodeURIComponent(`${quoteSheetName(sheetName)}!A:${lastColumn}`);
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
   await sheetsRequest(url, token, {
     method: 'POST',
@@ -223,5 +274,8 @@ async function checkLandingSheet(landingPage) {
 module.exports = {
   appendLandingSubmission,
   checkLandingSheet,
-  extractSpreadsheetId
+  extractSpreadsheetId,
+  normalizeContactFields,
+  rowForHeaders,
+  columnName
 };
