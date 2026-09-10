@@ -19,6 +19,9 @@
     "multer": "^2.1.1",
     "mysql2": "^3.15.3",
     "node-cron": "^4.5.0",
-    "nodemailer": "^8.0.2"
+    "nodemailer": "^8.0.2",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.3",
+    "zca-js": "^2.1.2"
   }
 }

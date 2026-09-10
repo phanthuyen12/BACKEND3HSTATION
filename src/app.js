@@ -19,9 +19,14 @@ runMigrations();
 const { startNodeverseSyncTask } = require('./tasks/nodeverseSyncTask');
 const { startFacebookSyncJob } = require('./tasks/facebookSyncJob');
 const { startFacebookFollowUpTask } = require('./tasks/facebookFollowUpTask');
+const zaloEngine = require('./services/zaloEngine.service');
+
 startNodeverseSyncTask();
 startFacebookSyncJob();
 // startFacebookFollowUpTask();
+
+// Auto connect Zalo session if saved
+zaloEngine.autoConnect();
 
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '10mb' }));

@@ -61,6 +61,7 @@ const router = express.Router();
 const adminFacebookRoutes = require('./adminFacebookRoutes');
 const facebookWebhookRoutes = require('./facebookWebhookRoutes');
 const landingPageRoutes = require('./landingPageRoutes');
+const zaloRoutes = require('./zalo.routes');
 
 // Authentication
 router.use('/auth', authRoutes);
@@ -115,6 +116,7 @@ router.use('/admin/mock-data', mockDataRoutes);
 
 router.use('/admin/facebook', adminFacebookRoutes);
 router.use('/facebook/webhook', facebookWebhookRoutes);
+router.use('/zalo', zaloRoutes);
 module.exports = router;
 
 

@@ -254,32 +254,7 @@ function compactText(value, maxLength = 240) {
 }
 
 function buildSessionMemory(historyLogs = [], pendingTurn = null) {
-  const turns = [];
-
-  historyLogs.forEach((log) => {
-    if (log.messageUser) {
-      turns.push(`Khach: ${compactText(log.messageUser)}`);
-    }
-
-    if (log.messageBot) {
-      turns.push(`Bot: ${compactText(log.messageBot)}`);
-    }
-
-    if (log.messageAdmin) {
-      turns.push(`Admin: ${compactText(log.messageAdmin)}`);
-    }
-  });
-
-  if (pendingTurn?.messageUser) {
-    turns.push(`Khach: ${compactText(pendingTurn.messageUser)}`);
-  }
-
-  if (pendingTurn?.messageBot) {
-    turns.push(`Bot: ${compactText(pendingTurn.messageBot)}`);
-  }
-
-  const sessionMemory = turns.slice(-6).join('\n');
-  return sessionMemory.length > 1800 ? sessionMemory.slice(-1800) : sessionMemory;
+  return '';
 }
 
 function extractLastQuestion(answer) {

@@ -39,8 +39,10 @@ async function receiveWebhookEvent(req, res) {
     // Trả về 200 OK ngay lập tức cho Facebook để tránh retry do quá 20s
     res.status(200).send('EVENT_RECEIVED');
 
+    console.log('[Facebook Webhook Received]', JSON.stringify(body, null, 2));
+
     try {
-      for (const entry of body.entry) {
+      for (const entry of (body.entry || [])) {
         // Duyệt qua mảng messaging chứa các tin nhắn nhận được
         if (!entry.messaging) continue;
         
@@ -56,15 +58,15 @@ async function receiveWebhookEvent(req, res) {
             continue;
           }
 
-          // Lấy tin nhắn text
-          const messageText = event.message?.text;
+          // Lấy nội dung từ message hoặc postback
+          const messageText = event.message?.text || event.postback?.payload || event.postback?.title;
           if (messageText) {
             console.log(`[Webhook] Tin nhắn mới từ ${senderId} gửi đến Page ${recipientId}: "${messageText}"`);
 
             // Kiểm tra xem Page này đã được kết nối trong hệ thống chưa
             const page = await FacebookPage.getByPageId(recipientId);
             if (!page) {
-              console.warn(`[Webhook] Page ID ${recipientId} chưa kết nối trong hệ thống. Bỏ qua xử lý tin nhắn.`);
+              console.warn(`[Webhook] Page ID ${recipientId} chưa kết nối trong hệ thống hoặc đây là gói tin Thử nghiệm từ Facebook.`);
               continue;
             }
 
