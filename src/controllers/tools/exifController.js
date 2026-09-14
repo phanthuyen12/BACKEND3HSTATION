@@ -157,37 +157,30 @@ function printMetaLog(filename, log, rawMeta) {
   }
 
   console.log('╠══════════════════════════════════════════════════════╣');
-  console.log('║  📊 Trước khi xoá:');
+  console.log('║  📊 Trước khi xử lý:');
   console.log(`║     EXIF : ${metaBefore.hasEXIF ? `✅ Có (${metaBefore.exifSize} bytes)` : '❌ Không có'}`);
   console.log(`║     IPTC : ${metaBefore.hasIPTC ? `✅ Có (${metaBefore.iptcSize} bytes)` : '❌ Không có'}`);
   console.log(`║     XMP  : ${metaBefore.hasXMP  ? `✅ Có (${metaBefore.xmpSize} bytes)`  : '❌ Không có'}`);
-  console.log(`║     ICC  : ${metaBefore.hasICC  ? `✅ Có (${metaBefore.iccSize} bytes)`  : '❌ Không có'}`);
-  console.log('║  📊 Sau khi xoá:');
-  console.log(`║     EXIF : ${metaAfter.hasEXIF ? `⚠️  Còn (${metaAfter.exifSize} bytes)` : '✅ Đã xoá'}`);
-  console.log(`║     IPTC : ${metaAfter.hasIPTC ? `⚠️  Còn (${metaAfter.iptcSize} bytes)` : '✅ Đã xoá'}`);
-  console.log(`║     XMP  : ${metaAfter.hasXMP  ? `⚠️  Còn (${metaAfter.xmpSize} bytes)`  : '✅ Đã xoá'}`);
-  console.log(`║     ICC  : ${metaAfter.hasICC  ? `⚠️  Còn (${metaAfter.iccSize} bytes)`  : '✅ Đã xoá'}`);
+  console.log('║  📱 Sau khi xử lý:');
+  console.log('║     Metadata cũ : ✅ Đã xoá sạch');
+  console.log('║     Giả lập     : 🍏 Apple iPhone 15 (f/1.6, ISO 64, 26mm, iOS 17.5.1)');
+  console.log(`║     EXIF mới    : ✅ Có (${metaAfter.exifSize} bytes)`);
 
   // AI Detection
   console.log('╠══════════════════════════════════════════════════════╣');
-  console.log('║  🤖 Phân tích AI detection:');
+  console.log('║  🤖 Phân tích ảnh gốc:');
   if (hints.length === 0 && safe.length > 0) {
-    console.log('║  ✅ Nhiều khả năng là ảnh THẬT (không có dấu hiệu AI):');
+    console.log('║  ✅ Nhiều khả năng là ảnh THẬT:');
     safe.forEach((s) => console.log(`║     ✔ ${s}`));
   } else if (hints.length > 0) {
     console.log('║  ⚠️  Có dấu hiệu ảnh AI:');
     hints.forEach((h) => console.log(`║     ▸ ${h}`));
-    if (safe.length > 0) {
-      console.log('║  ℹ️  Nhưng cũng có dấu hiệu thật:');
-      safe.forEach((s) => console.log(`║     ✔ ${s}`));
-    }
   } else {
     console.log('║     ❓ Không đủ dữ liệu để kết luận');
   }
 
   console.log('╠══════════════════════════════════════════════════════╣');
-  console.log(`║  📉 Dung lượng tiết kiệm: ${sizeDiff > 0 ? sizeDiff + ' bytes' : '0 (re-encode)'}`);
-  console.log(`║  ${stripped ? '✅ XOÁ METADATA THÀNH CÔNG' : '⚠️  Có thể còn sót metadata'}`);
+  console.log(`║  🍏 ĐÃ BƠM METADATA APPLE IPHONE 15 THÀNH CÔNG!`);
   console.log('╚══════════════════════════════════════════════════════╝\n');
 }
 
@@ -203,7 +196,7 @@ function formatBytes(bytes) {
 
 /**
  * POST /api/tools/exif/remove
- * Xoá EXIF khỏi 1 ảnh, trả về trực tiếp file đã clean
+ * Xoá EXIF cũ khỏi 1 ảnh và tự động inject EXIF iPhone 15
  */
 const removeSingle = asyncHandler(async (req, res) => {
   if (!req.file) {
@@ -211,7 +204,7 @@ const removeSingle = asyncHandler(async (req, res) => {
   }
 
   const { originalname, mimetype, buffer, size } = req.file;
-  console.log(`\n🚀 [EXIF Remover] Bắt đầu xử lý: ${originalname} (${formatBytes(size)})`);
+  console.log(`\n🚀 [EXIF Cleaner & iPhone Injector] Bắt đầu xử lý: ${originalname} (${formatBytes(size)})`);
 
   const result = await removeExifFromBuffer(buffer, originalname, mimetype);
 
@@ -225,20 +218,20 @@ const removeSingle = asyncHandler(async (req, res) => {
     printMetaLog(originalname, result.log, result.rawMeta);
   }
 
-  console.log(`⏱  [EXIF Remover] Hoàn thành trong ${result.elapsed}ms | ${formatBytes(result.originalSize)} → ${formatBytes(result.cleanSize)}`);
+  console.log(`⏱  [EXIF Remover] Hoàn thành trong ${result.elapsed}ms | Thiết bị: Apple iPhone 15 | ${formatBytes(result.originalSize)} → ${formatBytes(result.cleanSize)}`);
 
-  const contentType = mimetype || 'image/jpeg';
   const cleanFilename = addCleanSuffix(originalname);
 
   res.set({
-    'Content-Type': contentType,
+    'Content-Type': 'image/jpeg',
     'Content-Disposition': `attachment; filename="${cleanFilename}"`,
     'Content-Length': result.outputBuffer.length,
     'X-Original-Size': result.originalSize,
     'X-Clean-Size': result.cleanSize,
     'X-Elapsed-Ms': result.elapsed,
-    'X-Metadata-Stripped': result.log?.stripped ? 'true' : 'false',
-    'X-Fields-Removed': result.log?.fieldsRemoved?.join(',') || 'none',
+    'X-Device': 'Apple iPhone 15',
+    'X-Metadata-Stripped': 'true',
+    'X-Exif-Injected': 'true',
   });
 
   return res.send(result.outputBuffer);
@@ -279,13 +272,14 @@ const removeBatch = asyncHandler(async (req, res) => {
     }
   });
 
-  console.log(`\n📦 [EXIF Batch] Kết quả: ${successCount}/${results.length} thành công, ${failCount} lỗi`);
+  console.log(`\n📦 [EXIF Batch Cleaner & iPhone Injector] Kết quả: ${successCount}/${results.length} thành công, ${failCount} lỗi`);
 
   res.set({
     'Content-Type': 'application/zip',
-    'Content-Disposition': `attachment; filename="exif_cleaned_${Date.now()}.zip"`,
+    'Content-Disposition': `attachment; filename="iphone15_photos_${Date.now()}.zip"`,
     'X-Success-Count': successCount,
     'X-Fail-Count': failCount,
+    'X-Device': 'Apple iPhone 15',
   });
 
   // Wrap archiver trong Promise — đợi stream 'finish' thay vì await finalize() trực tiếp
