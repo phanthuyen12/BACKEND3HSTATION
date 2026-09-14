@@ -222,7 +222,7 @@ const removeSingle = asyncHandler(async (req, res) => {
 
   // In log chi tiết
   if (result.log) {
-    printMetaLog(originalname, result.log);
+    printMetaLog(originalname, result.log, result.rawMeta);
   }
 
   console.log(`⏱  [EXIF Remover] Hoàn thành trong ${result.elapsed}ms | ${formatBytes(result.originalSize)} → ${formatBytes(result.cleanSize)}`);
@@ -273,7 +273,7 @@ const removeBatch = asyncHandler(async (req, res) => {
   // In log cho từng ảnh
   results.forEach((r) => {
     if (r.success && r.log) {
-      printMetaLog(r.filename, r.log);
+      printMetaLog(r.filename, r.log, r.rawMeta);
     } else if (!r.success) {
       console.error(`❌ [EXIF Batch] ${r.filename}: ${r.error}`);
     }
