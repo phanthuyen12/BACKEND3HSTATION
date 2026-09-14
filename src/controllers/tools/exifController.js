@@ -288,26 +288,51 @@ const removeBatch = asyncHandler(async (req, res) => {
     'X-Fail-Count': failCount,
   });
 
-  const archive = archiver('zip', { zlib: { level: 6 } });
-  archive.pipe(res);
+  // Wrap archiver trong Promise — đợi stream 'finish' thay vì await finalize() trực tiếp
+  await new Promise((resolve, reject) => {
+    const archive = archiver('zip', { zlib: { level: 6 } });
 
-  results.forEach((result) => {
-    if (result.success) {
-      archive.append(result.outputBuffer, {
-        name: addCleanSuffix(result.filename),
-      });
+    // Bắt lỗi archiver
+    archive.on('error', (err) => {
+      console.error('❌ [Archiver] Lỗi tạo ZIP:', err.message);
+      reject(err);
+    });
+
+    // Warning (file thiếu, v.v.) — log nhưng không reject
+    archive.on('warning', (warn) => {
+      console.warn('⚠️  [Archiver] Warning:', warn.message);
+    });
+
+    // Khi response stream đã ghi xong
+    res.on('finish', () => {
+      console.log(`✅ [Archiver] ZIP đã gửi xong (${archive.pointer()} bytes total)`);
+      resolve();
+    });
+
+    res.on('error', reject);
+
+    archive.pipe(res);
+
+    // Append các ảnh đã xử lý thành công
+    results.forEach((result) => {
+      if (result.success) {
+        archive.append(result.outputBuffer, {
+          name: addCleanSuffix(result.filename),
+        });
+      }
+    });
+
+    // Append file log lỗi nếu có
+    if (failCount > 0) {
+      const failLog = results
+        .filter((r) => !r.success)
+        .map((r) => `${r.filename}: ${r.error}`)
+        .join('\n');
+      archive.append(failLog, { name: 'errors.txt' });
     }
+
+    archive.finalize();
   });
-
-  if (failCount > 0) {
-    const failLog = results
-      .filter((r) => !r.success)
-      .map((r) => `${r.filename}: ${r.error}`)
-      .join('\n');
-    archive.append(failLog, { name: 'errors.txt' });
-  }
-
-  await archive.finalize();
 });
 
 /**
@@ -338,4 +363,99 @@ function addCleanSuffix(filename) {
   return `${filename.slice(0, lastDot)}_clean${filename.slice(lastDot)}`;
 }
 
-module.exports = { removeSingle, removeBatch, getInfo };
+// ── Inject Metadata ───────────────────────────────────────────────────────────
+
+const { Worker } = require('worker_threads');
+const path = require('path');
+const INJECT_WORKER = path.join(__dirname, '../../utils/exifInjectWorker.js');
+
+const DEVICE_LABELS = {
+  'iphone_15':     'Apple iPhone 15',
+  'iphone_15_pro': 'Apple iPhone 15 Pro',
+  'samsung_s24':   'Samsung Galaxy S24',
+  'pixel_8':       'Google Pixel 8',
+};
+
+/**
+ * GET /api/tools/exif/devices — Danh sách thiết bị hỗ trợ
+ */
+const getDevices = asyncHandler(async (_req, res) => {
+  return res.json({
+    success: true,
+    data: Object.entries(DEVICE_LABELS).map(([key, label]) => ({ key, label })),
+  });
+});
+
+/**
+ * POST /api/tools/exif/inject
+ * Body: { device, datetime?, addGps?, lat?, lon? }
+ * File: image (form field)
+ */
+const injectMetadata = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return errorResponse(res, 'Vui lòng upload 1 ảnh', 400);
+  }
+
+  const { device = 'iphone_15', datetime, addGps, lat, lon } = req.body;
+  const { originalname, mimetype, buffer, size } = req.file;
+
+  console.log(`\n🔧 [EXIF Inject] ${originalname} (${formatBytes(size)}) → device: ${DEVICE_LABELS[device] || device}`);
+
+  const result = await new Promise((resolve, reject) => {
+    const worker = new Worker(INJECT_WORKER, {
+      workerData: {
+        inputBuffer: buffer.buffer.slice(
+          buffer.byteOffset,
+          buffer.byteOffset + buffer.byteLength
+        ),
+        filename: originalname,
+        deviceKey: device,
+        customDatetime: datetime || null,
+        addGps: addGps === 'true' || addGps === true,
+        gpsLat: lat,
+        gpsLon: lon,
+      },
+    });
+
+    worker.on('message', (msg) => {
+      if (msg.success) msg.outputBuffer = Buffer.from(msg.outputBuffer);
+      resolve(msg);
+    });
+    worker.on('error', reject);
+    worker.on('exit', (code) => {
+      if (code !== 0) reject(new Error(`Worker exited: ${code}`));
+    });
+  });
+
+  if (!result.success) {
+    console.error(`❌ [EXIF Inject] Lỗi: ${result.error}`);
+    return errorResponse(res, `Inject metadata thất bại: ${result.error}`, 500);
+  }
+
+  console.log(`✅ [EXIF Inject] Thành công!`);
+  console.log(`   Device  : ${result.device}`);
+  console.log(`   DateTime: ${result.datetime}`);
+  console.log(`   EXIF OK : ${result.hasExif}`);
+  console.log(`   Size    : ${formatBytes(result.originalSize)} → ${formatBytes(result.injectedSize)}`);
+
+  // Trả về JPEG (piexifjs luôn output JPEG)
+  const outFilename = addInjectedSuffix(originalname);
+  res.set({
+    'Content-Type': 'image/jpeg',
+    'Content-Disposition': `attachment; filename="${outFilename}"`,
+    'Content-Length': result.outputBuffer.length,
+    'X-Device': result.device,
+    'X-DateTime': result.datetime,
+    'X-Exif-Injected': result.hasExif ? 'true' : 'false',
+  });
+
+  return res.send(result.outputBuffer);
+});
+
+function addInjectedSuffix(filename) {
+  const lastDot = filename.lastIndexOf('.');
+  const base = lastDot === -1 ? filename : filename.slice(0, lastDot);
+  return `${base}_injected.jpg`;
+}
+
+module.exports = { removeSingle, removeBatch, getInfo, getDevices, injectMetadata };

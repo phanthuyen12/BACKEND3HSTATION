@@ -1,13 +1,15 @@
 /**
- * exifRoutes.js — Routes cho EXIF Metadata Remover tool
+ * exifRoutes.js — Routes cho EXIF Metadata Tool
  *
  * GET  /api/tools/exif/info         — Thông tin service
  * POST /api/tools/exif/remove       — Xoá EXIF 1 ảnh
  * POST /api/tools/exif/remove-batch — Xoá EXIF nhiều ảnh (đa luồng)
+ * GET  /api/tools/exif/devices      — Danh sách thiết bị hỗ trợ
+ * POST /api/tools/exif/inject       — Inject metadata giả vào ảnh
  */
 const express = require('express');
 const multer = require('multer');
-const { removeSingle, removeBatch, getInfo } = require('../../controllers/tools/exifController');
+const { removeSingle, removeBatch, getInfo, getDevices, injectMetadata } = require('../../controllers/tools/exifController');
 
 const router = express.Router();
 
@@ -30,7 +32,9 @@ const upload = multer({
 
 // Routes
 router.get('/info', getInfo);
+router.get('/devices', getDevices);
 router.post('/remove', upload.single('image'), removeSingle);
 router.post('/remove-batch', upload.array('images', 20), removeBatch);
+router.post('/inject', upload.single('image'), injectMetadata);
 
 module.exports = router;
