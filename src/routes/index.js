@@ -63,6 +63,9 @@ const facebookWebhookRoutes = require('./facebookWebhookRoutes');
 const landingPageRoutes = require('./landingPageRoutes');
 const zaloRoutes = require('./zalo.routes');
 
+// Tools routes
+const exifRoutes = require('./tools/exifRoutes');
+
 // Authentication
 router.use('/auth', authRoutes);
 
@@ -117,6 +120,10 @@ router.use('/admin/mock-data', mockDataRoutes);
 router.use('/admin/facebook', adminFacebookRoutes);
 router.use('/facebook/webhook', facebookWebhookRoutes);
 router.use('/zalo', zaloRoutes);
+
+// Tools
+router.use('/tools/exif', exifRoutes);
+
 module.exports = router;
 
 
