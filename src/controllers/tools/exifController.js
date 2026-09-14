@@ -9,16 +9,138 @@ const asyncHandler = require('../../utils/asyncHandler');
 const { errorResponse } = require('../../utils/response');
 const { removeExifFromBuffer, removeExifFromBuffers } = require('../../services/exifRemover.service');
 
+// ── IPTC Tag decoder ─────────────────────────────────────────────────────────
+// Ref: https://www.iptc.org/std/IIM/4.2/specification/IIMV4.2.pdf
+
+const IPTC_TAGS = {
+  5:  'Object Name',
+  7:  'Edit Status',
+  10: 'Urgency',
+  12: 'Subject Reference',
+  15: 'Category',
+  20: 'Supplemental Category',
+  22: 'Fixture Identifier',
+  25: 'Keywords',
+  26: 'Content Location Code',
+  27: 'Content Location Name',
+  30: 'Release Date',
+  35: 'Release Time',
+  37: 'Expiration Date',
+  38: 'Expiration Time',
+  40: 'Special Instructions',
+  42: 'Action Advised',
+  45: 'Reference Service',
+  47: 'Reference Date',
+  50: 'Reference Number',
+  55: 'Date Created',
+  60: 'Time Created',
+  62: 'Digital Creation Date',
+  63: 'Digital Creation Time',
+  65: 'Originating Program',
+  70: 'Program Version',
+  75: 'Object Cycle',
+  80: 'By-line (Author)',
+  85: 'By-line Title',
+  90: 'City',
+  92: 'Sub-location',
+  95: 'Province/State',
+  100: 'Country Code',
+  101: 'Country',
+  103: 'Original Transmission Reference',
+  105: 'Headline',
+  110: 'Credit',
+  115: 'Source',
+  116: 'Copyright Notice',
+  118: 'Contact',
+  120: 'Caption/Abstract',
+  122: 'Caption Writer',
+  130: 'Image Type',
+  131: 'Image Orientation',
+  135: 'Language Identifier',
+};
+
+function decodeIptc(buffer) {
+  const fields = [];
+  if (!buffer || buffer.length < 3) return fields;
+
+  let i = 0;
+  while (i < buffer.length - 4) {
+    if (buffer[i] !== 0x1c) { i++; continue; }
+    const record = buffer[i + 1];
+    const tag    = buffer[i + 2];
+    const len    = (buffer[i + 3] << 8) | buffer[i + 4];
+    i += 5;
+    if (record !== 2) { i += len; continue; }
+    const value = buffer.slice(i, i + len).toString('utf8').replace(/\x00/g, '').trim();
+    i += len;
+    if (value) {
+      fields.push({ tag, name: IPTC_TAGS[tag] || `Tag ${tag}`, value });
+    }
+  }
+  return fields;
+}
+
+// ── AI Detection heuristics ───────────────────────────────────────────────────
+
+function detectAiHints(metaBefore, iptcFields, xmpBuffer) {
+  const hints = [];
+  const safe  = [];
+
+  // 1. Không có EXIF = không có camera data (dấu hiệu AI)
+  if (!metaBefore.hasEXIF) hints.push('Không có EXIF camera data');
+  else safe.push('Có EXIF camera data (ảnh thật thường có)');
+
+  // 2. Kiểm tra XMP có chứa AI tools không
+  if (xmpBuffer) {
+    const xmpStr = xmpBuffer.toString('utf8');
+    const aiKeywords = ['midjourney', 'stable diffusion', 'dall-e', 'firefly',
+                        'generativeai', 'ai:generated', 'com.adobe.firefly',
+                        'synthid', 'c2pa', 'stableDiffusion'];
+    aiKeywords.forEach((kw) => {
+      if (xmpStr.toLowerCase().includes(kw.toLowerCase())) {
+        hints.push(`XMP chứa "${kw}" — dấu hiệu AI rõ ràng!`);
+      }
+    });
+  }
+
+  // 3. IPTC Source / Credit
+  const source = iptcFields.find((f) => f.tag === 115)?.value || '';
+  const credit = iptcFields.find((f) => f.tag === 110)?.value || '';
+  const caption = iptcFields.find((f) => f.tag === 120)?.value || '';
+  const prog = iptcFields.find((f) => f.tag === 65)?.value || '';
+
+  ['midjourney','stable diffusion','dall-e','openai','firefly','ai generated']
+    .forEach((kw) => {
+      [source, credit, caption, prog].forEach((field) => {
+        if (field.toLowerCase().includes(kw)) hints.push(`IPTC chứa "${kw}"`);
+      });
+    });
+
+  if (source.toLowerCase().includes('facebook') || credit.toLowerCase().includes('facebook')) {
+    safe.push('Source/Credit là Facebook (platform tự thêm IPTC)');
+  }
+
+  // 4. Size nhỏ, không có metadata = platform đã strip (Facebook, Twitter)
+  if (!metaBefore.hasEXIF && !metaBefore.hasXMP && metaBefore.hasIPTC) {
+    safe.push('Pattern: Facebook/platform strip EXIF nhưng giữ IPTC — ảnh thật bình thường');
+  }
+
+  return { hints, safe };
+}
+
 // ── Helper: In log metadata đẹp ra console ────────────────────────────────────
 
-function printMetaLog(filename, log) {
+function printMetaLog(filename, log, rawMeta) {
   const { metaBefore, metaAfter, fieldsRemoved, sizeDiff, stripped } = log;
+
+  // Decode IPTC nếu có
+  const iptcFields = rawMeta?.iptc ? decodeIptc(rawMeta.iptc) : [];
+  const { hints, safe } = detectAiHints(metaBefore, iptcFields, rawMeta?.xmp);
 
   console.log('\n╔══════════════════════════════════════════════════════╗');
   console.log(`║  🖼  EXIF Remover — ${filename}`);
   console.log('╠══════════════════════════════════════════════════════╣');
-  console.log(`║  📐 Kích thước : ${metaBefore.width}x${metaBefore.height}px | ${metaBefore.format?.toUpperCase()} | ${metaBefore.space}`);
-  console.log(`║  📦 File size  : ${formatBytes(metaBefore.width)} → Trước: raw buffer`);
+  console.log(`║  📐 Kích thước : ${metaBefore.width}x${metaBefore.height}px | ${(metaBefore.format||'').toUpperCase()} | ${metaBefore.space||''}`);
   console.log('╠══════════════════════════════════════════════════════╣');
 
   if (fieldsRemoved.length === 0) {
@@ -26,6 +148,12 @@ function printMetaLog(filename, log) {
   } else {
     console.log(`║  🔍 Metadata tìm thấy (${fieldsRemoved.length} loại):`);
     fieldsRemoved.forEach((f) => console.log(`║     ▸ ${f}`));
+  }
+
+  // IPTC decoded fields
+  if (iptcFields.length > 0) {
+    console.log('║  📋 Nội dung IPTC:');
+    iptcFields.forEach((f) => console.log(`║     [${String(f.tag).padStart(3)}] ${f.name}: ${f.value}`));
   }
 
   console.log('╠══════════════════════════════════════════════════════╣');
@@ -39,8 +167,26 @@ function printMetaLog(filename, log) {
   console.log(`║     IPTC : ${metaAfter.hasIPTC ? `⚠️  Còn (${metaAfter.iptcSize} bytes)` : '✅ Đã xoá'}`);
   console.log(`║     XMP  : ${metaAfter.hasXMP  ? `⚠️  Còn (${metaAfter.xmpSize} bytes)`  : '✅ Đã xoá'}`);
   console.log(`║     ICC  : ${metaAfter.hasICC  ? `⚠️  Còn (${metaAfter.iccSize} bytes)`  : '✅ Đã xoá'}`);
+
+  // AI Detection
   console.log('╠══════════════════════════════════════════════════════╣');
-  console.log(`║  📉 Dung lượng tiết kiệm: ${sizeDiff > 0 ? `${sizeDiff} bytes` : '0 (metadata không chiếm size sau encode lại)'}`);
+  console.log('║  🤖 Phân tích AI detection:');
+  if (hints.length === 0 && safe.length > 0) {
+    console.log('║  ✅ Nhiều khả năng là ảnh THẬT (không có dấu hiệu AI):');
+    safe.forEach((s) => console.log(`║     ✔ ${s}`));
+  } else if (hints.length > 0) {
+    console.log('║  ⚠️  Có dấu hiệu ảnh AI:');
+    hints.forEach((h) => console.log(`║     ▸ ${h}`));
+    if (safe.length > 0) {
+      console.log('║  ℹ️  Nhưng cũng có dấu hiệu thật:');
+      safe.forEach((s) => console.log(`║     ✔ ${s}`));
+    }
+  } else {
+    console.log('║     ❓ Không đủ dữ liệu để kết luận');
+  }
+
+  console.log('╠══════════════════════════════════════════════════════╣');
+  console.log(`║  📉 Dung lượng tiết kiệm: ${sizeDiff > 0 ? sizeDiff + ' bytes' : '0 (re-encode)'}`);
   console.log(`║  ${stripped ? '✅ XOÁ METADATA THÀNH CÔNG' : '⚠️  Có thể còn sót metadata'}`);
   console.log('╚══════════════════════════════════════════════════════╝\n');
 }

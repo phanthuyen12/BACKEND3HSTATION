@@ -42,6 +42,11 @@ function removeExifFromBuffer(inputBuffer, filename, mimeType) {
     worker.on('message', (result) => {
       if (result.success) {
         result.outputBuffer = Buffer.from(result.outputBuffer);
+        // Convert Array → Buffer cho rawMeta
+        if (result.rawMeta) {
+          if (result.rawMeta.iptc) result.rawMeta.iptc = Buffer.from(result.rawMeta.iptc);
+          if (result.rawMeta.xmp)  result.rawMeta.xmp  = Buffer.from(result.rawMeta.xmp);
+        }
       }
       resolve(result);
     });

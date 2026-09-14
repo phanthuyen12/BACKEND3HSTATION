@@ -73,6 +73,11 @@ async function removeExif() {
       originalSize: buffer.length,
       cleanSize: strippedBuffer.length,
       elapsed,
+      // Raw buffers cho IPTC decode + AI detection
+      rawMeta: {
+        iptc: metaBefore.iptc ? Array.from(metaBefore.iptc) : null,
+        xmp:  metaBefore.xmp  ? Array.from(metaBefore.xmp)  : null,
+      },
       // Log chi tiết để in ra console
       log: {
         metaBefore: metaLog,
