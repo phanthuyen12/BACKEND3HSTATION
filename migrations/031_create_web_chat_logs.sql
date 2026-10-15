@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS web_chat_logs (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  session_id VARCHAR(100) NOT NULL,
+  topic_id VARCHAR(120) DEFAULT NULL,
+  topic_label VARCHAR(255) DEFAULT NULL,
+  source_page VARCHAR(255) DEFAULT NULL,
+  role ENUM('user', 'assistant', 'system', 'lead') NOT NULL DEFAULT 'user',
+  event_type ENUM('message', 'lead_capture', 'status') NOT NULL DEFAULT 'message',
+  message LONGTEXT DEFAULT NULL,
+  dify_conversation_id VARCHAR(255) DEFAULT NULL,
+  contact_name VARCHAR(255) DEFAULT NULL,
+  contact_phone VARCHAR(50) DEFAULT NULL,
+  contact_email VARCHAR(255) DEFAULT NULL,
+  metadata_json LONGTEXT DEFAULT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_web_chat_session (session_id),
+  INDEX idx_web_chat_topic (topic_id),
+  INDEX idx_web_chat_role (role),
+  INDEX idx_web_chat_event_type (event_type),
+  INDEX idx_web_chat_created_at (created_at),
+  INDEX idx_web_chat_source_page (source_page)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

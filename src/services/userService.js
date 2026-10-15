@@ -1,0 +1,547 @@
+const ApiError = require('../utils/apiError');
+const userModel = require('../models/userModel');
+const rankModel = require('../models/rankModel');
+const rankCourseModel = require('../models/rankCourseModel');
+const courseModel = require('../models/courseModel');
+const courseProgressModel = require('../models/courseProgressModel');
+const { hashPassword, comparePassword } = require('../utils/password');
+const { buildPagination } = require('../utils/pagination');
+const { normalizeRole, isPrivilegedRole } = require('../utils/roles');
+const { query } = require('../config/database');
+const crypto = require('crypto');
+
+const generateApiToken = () => {
+  return crypto.randomBytes(32).toString('hex');
+};
+
+const generateRefCode = (userId) => {
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `REF${userId}${random}`;
+};
+
+const formatRank = (rank) => {
+  if (!rank) return null;
+  return {
+    id: String(rank.id),
+    code: rank.rank_code || rank.code || null,
+    name: rank.rank_name || rank.name || null,
+    description: rank.rank_description || rank.description || null,
+    status: rank.rank_status || rank.status || null
+  };
+};
+
+// Tạo rank object đúng từ user raw (sau khi JOIN ranks)
+const formatRankFromUser = (user) => {
+  if (!user || !user.rank_id) return null;
+  return formatRank({
+    id: user.rank_id,
+    rank_code: user.rank_code,
+    rank_name: user.rank_name,
+    rank_description: user.rank_description,
+    rank_status: user.rank_status
+  });
+};
+
+const getAllowedCoursesForRank = async (rankId) => {
+  if (!rankId) return [];
+  const allowedCourseIds = await rankCourseModel.getAllowedCourseIdsByRankIds([rankId]);
+  if (!allowedCourseIds.length) return [];
+
+  const placeholders = allowedCourseIds.map(() => '?').join(', ');
+  return query(
+    `
+      SELECT
+        c.id,
+        c.title,
+        c.short_description,
+        c.description,
+        c.category_id,
+        c.price,
+        c.thumbnail_url,
+        c.level,
+        c.students,
+        c.rating,
+        c.duration,
+        c.lessons,
+        c.status,
+        c.created_at,
+        c.updated_at,
+        cat.name AS category_name
+      FROM courses c
+      LEFT JOIN categories cat ON c.category_id = cat.id
+      WHERE c.status = 'active'
+        AND c.id IN (${placeholders})
+      ORDER BY c.created_at DESC
+    `,
+    allowedCourseIds
+  );
+};
+
+const buildStudentDashboard = async (user) => {
+  const rank = await rankModel.getRankById(user.rank_id);
+  const allowedCourses = isPrivilegedRole(user.role)
+    ? await courseModel.listCourses({ limit: 10000, offset: 0 })
+    : await getAllowedCoursesForRank(user.rank_id);
+  const inProgressCourses = await courseProgressModel.countInProgressCourses(user.id);
+  const completedCourses = await courseProgressModel.countCompletedCourses(user.id);
+  const completedLessons = await courseProgressModel.countCompletedLessons(user.id);
+  const progressRows = await courseProgressModel.getUserCourseProgress(user.id);
+
+  const progressByCourse = new Map(
+    progressRows.map((row) => [
+      String(row.course_id),
+      {
+        courseId: String(row.course_id),
+        totalLessons: Number(row.total_lessons || 0),
+        completedLessons: Number(row.completed_lessons || 0),
+        lastCompletedAt: row.last_completed_at || null
+      }
+    ])
+  );
+
+  const recommendedCourses = allowedCourses
+    .filter((course) => !progressByCourse.has(String(course.id)) || Number(progressByCourse.get(String(course.id)).completedLessons) < Number(progressByCourse.get(String(course.id)).totalLessons))
+    .slice(0, 6)
+    .map((course) => ({
+      id: String(course.id),
+      title: course.title,
+      category: course.category_name || '',
+      thumbnail: course.thumbnail_url || '',
+      price: String(course.price || 0),
+      status: course.status || 'active'
+    }));
+
+  return {
+    account: {
+      id: String(user.id),
+      name: user.name,
+      email: user.email,
+      rank: formatRank(rank)
+    },
+    stats: {
+      allowedCourses: allowedCourses.length,
+      inProgressCourses,
+      completedCourses,
+      progressRate: allowedCourses.length > 0
+        ? Math.round((completedCourses / allowedCourses.length) * 100)
+        : 0,
+      completedLessons
+    },
+    progress: Array.from(progressByCourse.values()),
+    recommendedCourses
+  };
+};
+
+const ensureBasicRankId = async () => {
+  let basicRank = await rankModel.getRankByCode('basic');
+
+  if (!basicRank) {
+    basicRank = await rankModel.createRank({
+      code: 'basic',
+      name: 'basic',
+      description: 'Rank mac dinh cho tai khoan user',
+      status: 'active'
+    });
+  }
+
+  return basicRank ? basicRank.id : null;
+};
+
+const ensureUserRefCode = async (user) => {
+  if (!user) return null;
+  if (user.ref_code) return user;
+
+  return userModel.updateUser(parseInt(user.id, 10), {
+    refCode: generateRefCode(user.id)
+  });
+};
+
+const listUsers = async ({ search, status, page, limit }) => {
+  const { limit: take, offset, page: currentPage } = buildPagination(page, limit);
+
+  const users = await userModel.listUsers({
+    search,
+    status,
+    limit: take,
+    offset
+  });
+
+  const total = await userModel.countUsers({ search, status });
+
+  const formattedUsers = users.map(user => ({
+    id: String(user.id),
+    name: user.name,
+    email: user.email,
+    phone: user.phone || '',
+    role: normalizeRole(user.role),
+    rank: formatRankFromUser(user),
+    balance: parseFloat(user.balance || 0),
+    status: user.status || 'active',
+    refCode: user.ref_code || null,
+    refBy: user.ref_by || null,
+    refCount: user.ref_count || 0,
+    refCommission: parseFloat(user.ref_commission || 0),
+    joinedAt: user.created_at,
+    lastLoginAt: user.last_login_at || null,
+    createdAt: user.created_at,
+    updatedAt: user.updated_at
+  }));
+
+  return {
+    data: formattedUsers,
+    pagination: {
+      page: currentPage,
+      limit: take,
+      total,
+      totalPages: Math.ceil(total / take)
+    }
+  };
+};
+
+const getUserById = async (id) => {
+  let user = await userModel.getUserById(parseInt(id));
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+
+  user = await ensureUserRefCode(user);
+
+  // Get user orders stats
+  const orders = await userModel.getUserOrdersStats(parseInt(id));
+  const directRefCount = await userModel.countDirectRefs(parseInt(id));
+
+  let parsedPermissions = [];
+  if (user.permissions) {
+    try {
+      parsedPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions;
+    } catch (e) {
+      parsedPermissions = [];
+    }
+  }
+
+  return {
+    id: String(user.id),
+    name: user.name,
+    email: user.email,
+    role: normalizeRole(user.role),
+    permissions: parsedPermissions,
+    phone: user.phone || '',
+    rank: formatRankFromUser(user),
+    balance: parseFloat(user.balance || 0),
+    status: user.status || 'active',
+    avatar: user.avatar_url || '',
+    address: user.address || '',
+    refCode: user.ref_code || null,
+    refBy: user.ref_by || null,
+    refCount: directRefCount,
+    refCommission: parseFloat(user.ref_commission || 0),
+    joinedAt: user.created_at,
+    lastLoginAt: user.last_login_at || null,
+    orders: {
+      total: orders.total || 0,
+      courses: orders.courses || 0,
+      workflows: orders.workflows || 0,
+      vps: orders.vps || 0
+    },
+    dashboard: await buildStudentDashboard(user),
+    createdAt: user.created_at,
+    updatedAt: user.updated_at
+  };
+};
+
+const createUser = async ({ name, email, phone, password, status, rankId, role = 'user', permissions = null }) => {
+  const existing = await userModel.getUserByEmail(email);
+  if (existing) {
+    throw ApiError.badRequest('Email already exists');
+  }
+
+  let finalRankId = rankId || null;
+  if (!finalRankId && !isPrivilegedRole(role)) {
+    finalRankId = await ensureBasicRankId();
+  }
+
+  const passwordHash = await hashPassword(password);
+  const user = await userModel.createUser({
+    name,
+    email,
+    phone,
+    passwordHash,
+    status: status || 'active',
+    rankId: finalRankId,
+    role: role || 'user',
+    permissions
+  });
+
+  return formatUserResponse(user);
+};
+
+const updateUser = async (id, payload) => {
+  const user = await userModel.getUserById(parseInt(id));
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+
+  if (payload.email && payload.email !== user.email) {
+    const existing = await userModel.getUserByEmail(payload.email);
+    if (existing) {
+      throw ApiError.badRequest('Email already exists');
+    }
+  }
+
+  const updated = await userModel.updateUser(parseInt(id), {
+    name: payload.name,
+    email: payload.email,
+    phone: payload.phone,
+    status: payload.status,
+    role: payload.role,
+    permissions: payload.permissions,
+    balance: payload.balance,
+    rankId: payload.rankId
+  });
+
+  return formatUserResponse(updated);
+};
+
+const toggleLock = async (id, status) => {
+  const user = await userModel.getUserById(parseInt(id));
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+
+  const updated = await userModel.updateUser(parseInt(id), { status });
+  return formatUserResponse(updated);
+};
+
+const deleteUser = async (id) => {
+  const user = await userModel.getUserById(parseInt(id));
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+  await userModel.deleteUser(parseInt(id));
+};
+
+const updateBalance = async (id, { amount, type, note }) => {
+  const user = await userModel.getUserById(parseInt(id));
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+
+  let newBalance = parseFloat(user.balance || 0);
+
+  if (type === 'add') {
+    newBalance += amount;
+  } else if (type === 'subtract') {
+    newBalance -= amount;
+    if (newBalance < 0) {
+      throw ApiError.badRequest('Insufficient balance');
+    }
+  } else if (type === 'set') {
+    newBalance = amount;
+  }
+
+  const updated = await userModel.updateUser(parseInt(id), { balance: newBalance });
+
+  // In a real implementation, you would log this transaction
+  return {
+    id: String(updated.id),
+    balance: newBalance,
+    updatedAt: updated.updated_at
+  };
+};
+
+const getStats = async () => {
+  const stats = await userModel.getUserStats();
+  return {
+    totalUsers: stats.total || 0,
+    totalActive: stats.active || 0,
+    totalLocked: stats.locked || 0
+  };
+};
+
+const getUserDetailStats = async (id) => {
+  const user = await userModel.getUserById(parseInt(id));
+  if (!user) throw ApiError.notFound('User not found');
+  const orderStats = await userModel.getUserOrdersStats(parseInt(id));
+  // Đếm số ref thực (ref_by = userId)
+  const [refCountRow] = await query('SELECT COUNT(*) as cnt FROM users WHERE ref_by = ?', [parseInt(id)]);
+  return {
+    totalOrders: orderStats.total || 0,
+    courses: orderStats.courses || 0,
+    workflows: orderStats.workflows || 0,
+    vps: orderStats.vps || 0,
+    totalRevenue: orderStats.revenue || 0,
+    refCount: Number(refCountRow?.cnt || 0),
+    refCommission: parseFloat(user.ref_commission || 0)
+  };
+};
+
+const getUserOrders = async (id, { type, page, limit }) => {
+  const user = await userModel.getUserById(parseInt(id));
+  if (!user) throw ApiError.notFound('User not found');
+  return userModel.getUserOrdersPaginated(parseInt(id), { type, page, limit });
+};
+
+const getUserRefs = async (id, { page, limit }) => {
+  const user = await userModel.getUserById(parseInt(id));
+  if (!user) throw ApiError.notFound('User not found');
+  return userModel.getUserRefs(parseInt(id), { page, limit });
+};
+
+const getMyReferrals = async (userId, { page, limit }) => {
+  let user = await userModel.getUserById(parseInt(userId));
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+
+  user = await ensureUserRefCode(user);
+
+  const referralData = await userModel.getUserRefs(parseInt(userId), { page, limit });
+  const directRefCount = await userModel.countDirectRefs(parseInt(userId));
+
+  return {
+    refCode: user.ref_code || null,
+    refCount: directRefCount,
+    refCommission: Number(referralData.totalCommission || user.ref_commission || 0),
+    registerPath: user.ref_code ? `/landing-register?ref=${encodeURIComponent(user.ref_code)}` : null,
+    referrals: (referralData.data || []).map((refUser) => ({
+      id: String(refUser.id),
+      name: refUser.name,
+      email: refUser.email,
+      phone: refUser.phone || '',
+      balance: Number(refUser.balance || 0),
+      status: refUser.status || 'active',
+      createdAt: refUser.created_at
+    })),
+    pagination: referralData.pagination
+  };
+};
+
+const updateMyProfile = async (userId, payload) => {
+  const user = await userModel.getUserById(parseInt(userId));
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+
+  await userModel.updateUser(parseInt(userId), {
+    name: payload.name !== undefined ? String(payload.name).trim() : undefined,
+    phone: payload.phone !== undefined ? String(payload.phone).trim() : undefined,
+    address: payload.address !== undefined ? String(payload.address).trim() : undefined,
+    avatarUrl: payload.avatar !== undefined ? payload.avatar : undefined
+  });
+
+  return getUserById(userId);
+};
+
+const updateUserRank = async (id, rankId) => {
+  const user = await userModel.getUserById(parseInt(id));
+  if (!user) throw ApiError.notFound('User not found');
+
+  if (rankId) {
+    const rank = await rankModel.getRankById(parseInt(rankId));
+    if (!rank) {
+      throw ApiError.notFound('Rank not found');
+    }
+  }
+
+  const updated = await userModel.updateUser(parseInt(id), { rankId: rankId || null });
+  return formatUserResponse(updated);
+};
+
+const adminResetPassword = async (id, newPassword) => {
+  const user = await userModel.getUserById(parseInt(id));
+  if (!user) throw ApiError.notFound('User not found');
+  const passwordHash = await hashPassword(newPassword);
+  const apiToken = generateApiToken();
+  await userModel.updateUser(parseInt(id), { passwordHash, apiToken });
+  return true;
+};
+
+const getMyDashboard = async (userId) => {
+  const user = await userModel.getUserById(parseInt(userId));
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+
+  return buildStudentDashboard(user);
+};
+
+const formatUserResponse = (user) => {
+  let parsedPermissions = [];
+  if (user.permissions) {
+    try {
+      parsedPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions;
+    } catch (e) {
+      parsedPermissions = [];
+    }
+  }
+
+  return {
+    id: String(user.id),
+    name: user.name,
+    email: user.email,
+    phone: user.phone || '',
+    role: normalizeRole(user.role),
+    permissions: parsedPermissions,
+    rank: formatRankFromUser(user),
+    balance: parseFloat(user.balance || 0),
+    status: user.status || 'active',
+    joinedAt: user.created_at,
+    lastLoginAt: user.last_login_at || null,
+    createdAt: user.created_at,
+    updatedAt: user.updated_at
+  };
+};
+
+const getUserByEmail = (email) => userModel.getUserByEmail(email);
+
+const changePassword = async (userId, { currentPassword, newPassword }) => {
+  // Lấy user với password hash
+  const user = await userModel.getUserByIdWithPassword(parseInt(userId));
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+
+  // Kiểm tra mật khẩu hiện tại
+  const isMatch = await comparePassword(currentPassword, user.password_hash);
+  if (!isMatch) {
+    throw ApiError.badRequest('Current password is incorrect');
+  }
+
+  // Hash mật khẩu mới
+  const newPasswordHash = await hashPassword(newPassword);
+
+  // Tạo lại api Token mới cho bảo mật
+  const apiToken = generateApiToken();
+
+  // Cập nhật mật khẩu và api token
+  await userModel.updateUser(parseInt(userId), {
+    passwordHash: newPasswordHash,
+    apiToken
+  });
+
+  return true;
+};
+
+const getUserByApiToken = (apiToken) => userModel.getUserByApiToken(apiToken);
+
+module.exports = {
+  listUsers,
+  getUserById,
+  createUser,
+  updateUser,
+  toggleLock,
+  deleteUser,
+  updateBalance,
+  getStats,
+  getUserDetailStats,
+  getUserOrders,
+  getUserRefs,
+  getMyReferrals,
+  updateUserRank,
+  adminResetPassword,
+  getUserByEmail,
+  changePassword,
+  getUserByApiToken,
+  getMyDashboard,
+  updateMyProfile
+};

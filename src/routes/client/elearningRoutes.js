@@ -1,0 +1,101 @@
+const express = require('express');
+const Joi = require('joi');
+const { authenticate, optionalAuth } = require('../../middlewares/auth');
+const validate = require('../../middlewares/validate');
+const elearningController = require('../../controllers/client/elearningController');
+
+const router = express.Router();
+
+// GET /api/client/elearning/courses - Lấy danh sách khoá học cho client
+router.get(
+  '/courses',
+  optionalAuth,
+  validate({
+    query: Joi.object({
+      category: Joi.string().optional(),
+      search: Joi.string().allow('').optional(),
+      page: Joi.number().integer().min(1).optional(),
+      limit: Joi.number().integer().min(1).max(100).optional()
+    })
+  }),
+  elearningController.listCourses
+);
+
+// GET /api/client/elearning/courses/:id - Lấy chi tiết khoá học cho client
+router.get(
+  '/courses/:id',
+  optionalAuth,
+  validate({
+    params: Joi.object({
+      id: Joi.string().required()
+    })
+  }),
+  elearningController.getCourseById
+);
+
+// GET /api/client/elearning/courses/:id/enrollment - Check enrollment status
+// Using optionalAuth to allow checking without login, but will return false if not logged in
+router.get(
+  '/courses/:id/enrollment',
+  optionalAuth,
+  validate({
+    params: Joi.object({
+      id: Joi.string().required()
+    })
+  }),
+  elearningController.checkEnrollment
+);
+
+// POST /api/client/elearning/courses/:id/enroll - Đăng ký khóa học
+router.post(
+  '/courses/:id/enroll',
+  authenticate,
+  validate({
+    params: Joi.object({
+      id: Joi.string().required()
+    })
+  }),
+  elearningController.enrollCourse
+);
+
+router.post(
+  '/courses/:courseId/videos/:videoId/progress',
+  authenticate,
+  validate({
+    params: Joi.object({
+      courseId: Joi.number().integer().positive().required(),
+      videoId: Joi.number().integer().positive().required()
+    }),
+    body: Joi.object({
+      watchedSeconds: Joi.number().min(0).optional(),
+      durationSeconds: Joi.number().min(0).optional(),
+      lastPositionSeconds: Joi.number().min(0).optional(),
+      progressPercent: Joi.number().min(0).max(100).optional(),
+      completed: Joi.boolean().optional()
+    })
+      .or('watchedSeconds', 'durationSeconds', 'lastPositionSeconds', 'progressPercent', 'completed')
+  }),
+  elearningController.updateVideoProgress
+);
+
+router.get('/me/dashboard', authenticate, elearningController.getDashboard);
+router.get('/me/rank', authenticate, elearningController.getRankSummary);
+
+// GET /api/client/elearning/categories - Lấy danh sách danh mục khoá học
+router.get(
+  '/categories',
+  elearningController.listCategories
+);
+
+module.exports = router;
+
+
+
+
+
+
+
+
+
+
+
