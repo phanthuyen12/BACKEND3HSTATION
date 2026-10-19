@@ -302,24 +302,51 @@ module.exports = {
   },
 
   async subscribePageWebhook(pageId, pageAccessToken) {
-    try {
-      const url = `https://graph.facebook.com/v20.0/${pageId}/subscribed_apps`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          subscribed_fields: 'messages,messaging_postbacks',
-          access_token: pageAccessToken
-        })
-      });
-      const data = await res.json();
-      console.log(`[Facebook Webhook] Subscribed page ${pageId}:`, data);
-      return data;
-    } catch (err) {
-      console.error(`[Facebook Webhook] Failed to subscribe page ${pageId}:`, err);
+    if (!pageId || !pageAccessToken || pageAccessToken === 'mock_token') {
+      throw new Error('Page ID và Page Access Token hợp lệ là bắt buộc để đăng ký webhook.');
     }
+
+    const url = `https://graph.facebook.com/v20.0/${encodeURIComponent(pageId)}/subscribed_apps`;
+    const form = new URLSearchParams({
+      subscribed_fields: 'messages,messaging_postbacks',
+      access_token: pageAccessToken,
+    });
+    let lastError;
+
+    // Facebook/Graph API có thể lỗi tạm thời; retry trước khi báo thất bại.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: form,
+          signal: AbortSignal.timeout(15000),
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.error || data.success !== true) {
+          const error = new Error(data.error?.message || `Graph API trả HTTP ${res.status} khi đăng ký webhook.`);
+          error.code = data.error?.code;
+          error.error_subcode = data.error?.error_subcode;
+          throw error;
+        }
+
+        console.info(`[Facebook Webhook] Subscribed page ${pageId}`, {
+          fields: 'messages,messaging_postbacks',
+        });
+        return data;
+      } catch (err) {
+        lastError = err;
+        if (attempt < 2) await sleep(500 * (attempt + 1));
+      }
+    }
+
+    console.error(`[Facebook Webhook] Failed to subscribe page ${pageId}:`, {
+      message: lastError?.message,
+      code: lastError?.code,
+      error_subcode: lastError?.error_subcode,
+    });
+    throw lastError;
   },
 
   async unsubscribePageWebhook(pageId, pageAccessToken) {
@@ -378,6 +405,9 @@ module.exports = {
           avatarUrl: page.avatarUrl
         });
         const updated = await FacebookPage.getById(page.id);
+        if (updated.accessToken && updated.accessToken !== 'mock_token') {
+          await this.subscribePageWebhook(updated.pageId, updated.accessToken);
+        }
         return { success: true, pages: [updated] };
       }
     }
@@ -451,6 +481,7 @@ module.exports = {
       }
 
       const savedPages = [];
+      const webhookSubscriptions = [];
       const incomingPageIds = accountsData.data.map(p => String(p.id));
 
       // 3. Cập nhật danh sách Page vào DB
@@ -482,7 +513,24 @@ module.exports = {
         }
 
         // Tự động kích hoạt Webhook Subscription trên FB cho page này
-        await this.subscribePageWebhook(page.id, page.access_token);
+        try {
+          await this.subscribePageWebhook(page.id, page.access_token);
+          webhookSubscriptions.push({
+            pageId: String(page.id),
+            pageName: page.name,
+            success: true,
+          });
+        } catch (subscriptionError) {
+          // Giữ kết nối Page để người dùng không phải OAuth lại; log đầy đủ để
+          // phát hiện Page đang connected nhưng chưa nhận được webhook.
+          console.error(`[Facebook Webhook] Page ${page.id} connected but subscription failed:`, subscriptionError.message);
+          webhookSubscriptions.push({
+            pageId: String(page.id),
+            pageName: page.name,
+            success: false,
+            error: subscriptionError.message,
+          });
+        }
       }
 
       // 4. Hủy kết nối các Page trước đây đã kết nối nhưng lần này bị bỏ chọn
@@ -502,7 +550,7 @@ module.exports = {
         }
       }
 
-      return { success: true, pages: savedPages };
+      return { success: true, pages: savedPages, webhookSubscriptions };
     } catch (error) {
       console.error("Facebook OAuth Error:", error);
       throw new Error("Lấy dữ liệu từ Facebook thất bại: " + error.message);
