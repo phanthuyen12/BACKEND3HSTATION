@@ -331,10 +331,27 @@ module.exports = {
           throw error;
         }
 
+        const verifyUrl = `${url}?access_token=${encodeURIComponent(pageAccessToken)}`;
+        const verifyRes = await fetch(verifyUrl, { signal: AbortSignal.timeout(15000) });
+        const verifyData = await verifyRes.json();
+        if (!verifyRes.ok || verifyData.error) {
+          throw new Error(verifyData.error?.message || `Không thể xác minh subscription (HTTP ${verifyRes.status}).`);
+        }
+
+        const subscriptions = verifyData.data || [];
+        const appSubscription = subscriptions.find((subscription) =>
+          subscription.subscribed_fields?.includes('messages')
+        );
+        if (!appSubscription) {
+          throw new Error('Facebook chấp nhận lệnh nhưng Page chưa có subscribed field messages khi đọc xác minh lại.');
+        }
+
         console.info(`[Facebook Webhook] Subscribed page ${pageId}`, {
-          fields: 'messages,messaging_postbacks',
+          fields: appSubscription.subscribed_fields,
+          appId: appSubscription.id,
+          verified: true,
         });
-        return data;
+        return { ...data, verified: true, subscribed_fields: appSubscription.subscribed_fields };
       } catch (err) {
         lastError = err;
         if (attempt < 2) await sleep(500 * (attempt + 1));
